@@ -1,0 +1,15 @@
+{
+"test-description": "Some description of this",
+"test-cases": [
+{
+"name" : "valid",
+"inputs" : 1,
+"expected-output" : "One"
+},
+{
+"name" : "invalid",
+"inputs" : 2,
+"expected-output" : null
+}
+]
+}

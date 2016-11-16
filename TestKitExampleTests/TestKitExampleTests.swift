@@ -9,27 +9,51 @@
 import XCTest
 @testable import TestKitExample
 
+extension Bool : TestableOutput {
+    typealias ExpectedOutputType = Bool
+    func validate(expected output: Bool) -> Bool {
+        return self == output
+    }
+}
+
+extension String : TestableOutput {
+    typealias ExpectedOutputType = String
+    func validate(expected output: String) -> Bool {
+        return self == output
+    }
+}
+
+extension Person : TestableOutput {
+    typealias ExpectedOutputType = TestKitDictionary
+    func validate(expected output: TestKitDictionary) -> Bool {
+        guard let full = output["fullName"] as? String, let age = output["age"] as? Int, let first = output["firstName"] as? String else {
+            return false
+        }
+        return fullName == full && self.age == age && firstName == first
+    }
+}
+
+
 class TestKitExampleTests: XCTestCase {
     
-    override func setUp() {
-        super.setUp()
-        // Put setup code here. This method is called before the invocation of each test method in the class.
+    func testIsValidInt() {
+        TestKit.runTestCases(file: "test"){
+            (input:Any?) -> Bool in
+            return isValidInt(int: input)
+        }
     }
     
-    override func tearDown() {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-        super.tearDown()
+    func testMatch() {
+        TestKit.runTestCases(file: "MatchTest") {
+            (input:Int) -> String? in
+            return matchingValue(for: input)
+        }
     }
     
-    func testExample() {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-    }
-    
-    func testPerformanceExample() {
-        // This is an example of a performance test case.
-        self.measure {
-            // Put the code you want to measure the time of here.
+    func testPerson() {
+        TestKit.runTestCases(file: "ValidPersonTests") {
+            (input:[String:Any]) -> Person in
+            return Person(first: input["first"] as! String, last: input["last"] as! String, age:input["age"] as? Int ?? 18)
         }
     }
     

@@ -1,0 +1,20 @@
+{
+    "test-description": "Some description of this",
+    "test-cases": [
+                   {
+                   "name" : "valid Ints",
+                   "inputs" : [5, 10, 99, 1],
+                   "expected-output" : true
+                   },
+                   {
+                   "name" : "invalid types",
+                   "inputs" : ["5", null, 43.5, {"value":3}],
+                   "expected-output" : false
+                   },
+                   {
+                   "name" : "invalid Ints",
+                   "inputs" : [-1, -10000, 101, 39492494],
+                   "expected-output" : false
+                   }
+                   ]
+}

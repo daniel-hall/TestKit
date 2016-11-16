@@ -14,6 +14,9 @@
 		CECA905D1DD014000057AA8A /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = CECA905B1DD014000057AA8A /* LaunchScreen.storyboard */; };
 		CECA90681DD014000057AA8A /* TestKitExampleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECA90671DD014000057AA8A /* TestKitExampleTests.swift */; };
 		CECA90731DD0153B0057AA8A /* TestKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECA90721DD0153B0057AA8A /* TestKit.swift */; };
+		CECA90791DDC332C0057AA8A /* test.testkit in Resources */ = {isa = PBXBuildFile; fileRef = CECA90761DDC332C0057AA8A /* test.testkit */; };
+		CECA907A1DDC332C0057AA8A /* MatchTest.testkit in Resources */ = {isa = PBXBuildFile; fileRef = CECA90771DDC332C0057AA8A /* MatchTest.testkit */; };
+		CECA907B1DDC332C0057AA8A /* ValidPersonTests.testkit in Resources */ = {isa = PBXBuildFile; fileRef = CECA90781DDC332C0057AA8A /* ValidPersonTests.testkit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -38,6 +41,9 @@
 		CECA90671DD014000057AA8A /* TestKitExampleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestKitExampleTests.swift; sourceTree = "<group>"; };
 		CECA90691DD014000057AA8A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CECA90721DD0153B0057AA8A /* TestKit.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestKit.swift; sourceTree = "<group>"; };
+		CECA90761DDC332C0057AA8A /* test.testkit */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = test.testkit; sourceTree = "<group>"; };
+		CECA90771DDC332C0057AA8A /* MatchTest.testkit */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = MatchTest.testkit; sourceTree = "<group>"; };
+		CECA90781DDC332C0057AA8A /* ValidPersonTests.testkit */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = ValidPersonTests.testkit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -95,6 +101,9 @@
 				CECA90671DD014000057AA8A /* TestKitExampleTests.swift */,
 				CECA90691DD014000057AA8A /* Info.plist */,
 				CECA90721DD0153B0057AA8A /* TestKit.swift */,
+				CECA90761DDC332C0057AA8A /* test.testkit */,
+				CECA90771DDC332C0057AA8A /* MatchTest.testkit */,
+				CECA90781DDC332C0057AA8A /* ValidPersonTests.testkit */,
 			);
 			path = TestKitExampleTests;
 			sourceTree = "<group>";
@@ -194,6 +203,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CECA907B1DDC332C0057AA8A /* ValidPersonTests.testkit in Resources */,
+				CECA907A1DDC332C0057AA8A /* MatchTest.testkit in Resources */,
+				CECA90791DDC332C0057AA8A /* test.testkit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
