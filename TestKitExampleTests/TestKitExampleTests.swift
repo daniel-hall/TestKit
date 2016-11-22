@@ -37,21 +37,24 @@ extension Person : TestableOutput {
 class TestKitExampleTests: XCTestCase {
     
     func testIsValidInt() {
-        TestKit.runTestCases(file: "test"){
+        let spec = TestKitSpec.init(file: "IsValidInt") { XCTFail($0.message) }
+        spec.run(){
             (input:Any?) -> Bool in
             return isValidInt(int: input)
         }
     }
     
     func testMatch() {
-        TestKit.runTestCases(file: "MatchTest") {
+        let spec = TestKitSpec.init(file: "MatchTest") { XCTFail($0.message) }
+        spec.run(){
             (input:Int) -> String? in
             return matchingValue(for: input)
         }
     }
     
     func testPerson() {
-        TestKit.runTestCases(file: "ValidPersonTests") {
+        let spec = TestKitSpec.init(file: "ValidPersonTests") { XCTFail($0.message) }
+        spec.run(){
             (input:[String:Any]) -> Person in
             return Person(first: input["first"] as! String, last: input["last"] as! String, age:input["age"] as? Int ?? 18)
         }
