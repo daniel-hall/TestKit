@@ -9,25 +9,24 @@
 import Foundation
 import XCTest
 
-
 protocol TestableOutput {
     associatedtype ExpectedOutputType
     func validate(expected output: ExpectedOutputType) -> Bool
 }
 
+protocol TestableError {
+    func validate(expected output: TestKitDictionary) -> Bool
+}
+
 final class TestKitDictionary {
     fileprivate let dictionary: [String:Any]
-    fileprivate let file:String
-    fileprivate let testcase:String
     fileprivate var usedKeys = [String]()
     fileprivate var unusedKeys:[String] {
         return Array(Set(dictionary.keys).subtracting(Set(usedKeys)))
     }
     
-    fileprivate init(dictionary:[String: Any], file:String, testcase:String) {
+    fileprivate init(dictionary:[String: Any]) {
         self.dictionary = dictionary
-        self.file = file
-        self.testcase = testcase
     }
     
     subscript(key: String) -> Any? {
@@ -40,215 +39,501 @@ final class TestKitDictionary {
     }
 }
 
-
-enum TestKit {
+struct TestKitSpec {
+    let testDescription:String?
+    let testCases:[TestKitCase]
+    let sourceFile:String
+    private let failureHandler:(TestKitFailure)->()
     
-    private struct Case {
-        let name:String
-        let description:String?
-        let inputs:[Any]?
-        let expectedOutput:Any?
-        let expectedOutputType:String?
-        let expectedErrorType:String?
+    fileprivate var casesExist:Bool {
+        return testCases.count > 0
+    }
+    
+    init(file:String, failureHandler:@escaping (TestKitFailure)->()) {
+        var cases = [TestKitCase]()
+        var description:String? = nil
+        if let url = Bundle(for:TestKitDictionary.self).url(forResource: file, withExtension: "testkit") {
+            if let data = try? Data(contentsOf:url) {
+                if let json = try? JSONSerialization.jsonObject(with: data, options: []) {
+                    if let dictionary = json as? [String:Any] {
+                        description = dictionary["test-description"] as? String
+                        if let array = dictionary["test-cases"] as? [[String:Any]] {
+                            let parsedCases = array.flatMap{ TestKitCase(from: $0, file:(file + ".testkit"), fail:{ TestKitSpec.fail(with: $0, failureHandler: failureHandler) }) }
+                            cases = parsedCases.count == array.count ? parsedCases : cases
+                        } else {
+                            TestKitSpec.fail(with: TestKitFailure(message:"The TestKit JSON file named \"\(file)\" does not have an array of cases for the key \"test-cases\"", file:file), failureHandler: failureHandler)
+                        }
+                    }else {
+                        TestKitSpec.fail(with: TestKitFailure(message:"The TestKit JSON file named \"\(file)\" does not have a dictionary as the root element.", file:file), failureHandler: failureHandler)
+                    }
+                } else {
+                    TestKitSpec.fail(with: TestKitFailure(message:"The TestKit file named \"\(file)\" contains invalid JSON", file:file), failureHandler: failureHandler)
+                }
+            } else {
+                TestKitSpec.fail(with: TestKitFailure(message:"The TestKit file named \"\(file)\" could not be read", file:file), failureHandler: failureHandler)
+            }
+        }else {
+            TestKitSpec.fail(with: TestKitFailure(message:"No TestKit test file was found with the name \"\(file)\"", file:file), failureHandler: failureHandler)
+        }
         
-        init(from dictionary:[String:Any], filename:String) {
-            guard let name = dictionary["name"] as? String else {
-                XCTFail("Missing or wrong type of value for test case name (key: \"name\") in file \(filename)")
-                fatalError()
+        testCases = cases
+        testDescription = description
+        sourceFile = file + ".testkit"
+        self.failureHandler = failureHandler
+    }
+    
+    // MARK: Private Static Functions
+    
+    static private func fail(with failure:TestKitFailure, failureHandler:@escaping (TestKitFailure)->()) {
+        let closure = {
+            let observer = TestObserver()
+            observer.register()
+            print("\n")
+            failureHandler(failure)
+            if !observer.failureReported {
+                XCTFail(failure.message)
             }
-            guard dictionary.keys.contains("inputs") else {
-                XCTFail("Missing value for test case input (key: \"inputs\") for test case \"\(name)\" in file \(filename)")
-                fatalError()
+            observer.unregister()
+        }
+        
+        if !Thread.current.isMainThread {
+            DispatchQueue.main.sync(execute: closure)
+        } else {
+            closure()
+        }
+    }
+    
+    // MARK: Public Functions
+    
+    func run<Input, Output:TestableOutput>(testClosure:@escaping (Input)->Output) {
+        if casesExist {
+            print("\nTESTKIT: Running tests from file: \"\(sourceFile)\"")
+            var failedCases = 0
+            testCases.forEach{
+                testCase in
+                print("\n\tTESTKIT: Starting test case named:\"\(testCase.name)\"")
+                let result = testCase.inputs.enumerated().reduce(TestState<Input, Output>(testSpec:self, testCase:testCase, testClosure:testClosure)){
+                    (reduceInput:(initialState:TestState<Input, Output>, input:(Int, Any))) -> TestState<Input, Output>  in
+                    return castInput(input: reduceInput.input).flatMap(failIfExpectErrorFromNonThrowingClosure).flatMap(outputForInput).flatMap(validatedOutput).flatMap(nonNilOutputIsSuccess).flatMap(printCaseSuccess).flatMap(printCaseFailed).runState(reduceInput.initialState).state
+                }
+                print("\tTESTKIT: The test case named:\"\(result.testCase.name)\" has \(result.casePassed ? "PASSED" : "FAILED") \n")
+                failedCases = result.casePassed ? failedCases : failedCases + 1
             }
-            guard dictionary.keys.contains("expected-output") else {
-                XCTFail("Missing value for test case expected output (key: \"expected-output\") for test case \"\(name)\" in file \(filename)")
-                fatalError()
+            print("\nTESTKIT: \(testCases.count - failedCases)/\(testCases.count) test cases PASSED for the file: \"\(sourceFile)\" \n")
+        } else {
+            fail(with: TestKitFailure(message:"No valid test cases found in the file \"\(sourceFile)\". Unable to run. \n", file:sourceFile))
+        }
+    }
+    
+    func run<Input, Output:TestableOutput>(testClosure:@escaping (Input) throws -> Output) {
+        if casesExist {
+            print("\nTESTKIT: Running tests from file: \"\(sourceFile)\"")
+            var failedCases = 0
+            testCases.forEach{
+                testCase in
+                print("\n\tTESTKIT: Starting test case named:\"\(testCase.name)\"")
+                let result = testCase.inputs.enumerated().reduce(TestState<Input, Output>(testSpec:self, testCase:testCase, testClosure:testClosure)){
+                    (reduceInput:(initialState:TestState<Input, Output>, input:(Int, Any))) -> TestState<Input, Output>  in
+                    return castInput(input: reduceInput.input).flatMap(expectErrorOrFail).flatMap(validateError).flatMap(printCaseSuccess).flatMap(printCaseFailed).runState(reduceInput.initialState).state
+                }
+                print("\tTESTKIT: The test case named:\"\(result.testCase.name)\" has \(result.casePassed ? "PASSED" : "FAILED") \n")
+                failedCases = result.casePassed ? failedCases : failedCases + 1
+            }
+            print("\nTESTKIT: \(testCases.count - failedCases)/\(testCases.count) test cases PASSED for the file: \"\(sourceFile)\" \n")
+        } else {
+            fail(with: TestKitFailure(message:"No valid test cases found in the file \"\(sourceFile)\". Unable to run. \n", file:sourceFile))
+        }
+    }
+    
+    func run<Input, Output:TestableOutput>(testClosure:@escaping (Input)->Output?) {
+        if casesExist {
+            print("\nTESTKIT: Running tests from file: \"\(sourceFile)\"")
+            var failedCases = 0
+            testCases.forEach{
+                testCase in
+                print("\n\tTESTKIT: Starting test case named:\"\(testCase.name)\"")
+                
+                let result = testCase.inputs.enumerated().reduce(TestState<Input, Output>(testSpec:self, testCase:testCase, testClosure:testClosure)){
+                    (reduceInput:(initialState:TestState<Input, Output>, input:(Int, Any))) -> TestState<Input, Output>  in
+                    return castInput(input: reduceInput.input).flatMap(failIfExpectErrorFromNonThrowingClosure).flatMap(outputForInput).flatMap(validatedOutput).flatMap(nilOptionalOutputMightBeSuccess).flatMap(printCaseSuccess).flatMap(printCaseFailed).runState(reduceInput.initialState).state
+                }
+                print("\tTESTKIT: The test case named:\"\(result.testCase.name)\" has \(result.casePassed ? "PASSED" : "FAILED") \n")
+                failedCases = result.casePassed ? failedCases : failedCases + 1
+            }
+            print("\nTESTKIT: \(testCases.count - failedCases)/\(testCases.count) test cases passed for the file: \"\(sourceFile)\" \n")
+        } else {
+            fail(with: TestKitFailure(message:"No valid test cases found in the file \"\(sourceFile)\". Unable to run.", file:sourceFile))
+        }
+    }
+    
+    func run<Input, Output:TestableOutput>(testClosure:@escaping (Input) throws ->Output?) {
+        if casesExist {
+            print("\nTESTKIT: Running tests from file: \"\(sourceFile)\"")
+            var failedCases = 0
+            testCases.forEach{
+                testCase in
+                print("\n\tTESTKIT: Starting test case named:\"\(testCase.name)\"")
+                let result = testCase.inputs.enumerated().reduce(TestState<Input, Output>(testSpec:self, testCase:testCase, testClosure:testClosure)){
+                    (reduceInput:(initialState:TestState<Input, Output>, input:(Int, Any))) -> TestState<Input, Output>  in
+                    return castInput(input: reduceInput.input).flatMap(expectErrorOrFail).flatMap(validateError).flatMap(printCaseSuccess).flatMap(printCaseFailed).runState(reduceInput.initialState).state
+                }
+                print("\tTESTKIT: The test case named:\"\(result.testCase.name)\" has \(result.casePassed ? "PASSED" : "FAILED") \n")
+                failedCases = result.casePassed ? failedCases : failedCases + 1
+            }
+            print("\nTESTKIT: \(testCases.count - failedCases)/\(testCases.count) test cases passed for the file: \"\(sourceFile)\" \n")
+        } else {
+            fail(with: TestKitFailure(message:"No valid test cases found in the file \"\(sourceFile)\". Unable to run.", file:sourceFile))
+        }
+    }
+    
+    // MARK: Fileprivate Functions
+    
+    fileprivate func fail(with failure:TestKitFailure) {
+        TestKitSpec.fail(with: failure, failureHandler: failureHandler)
+    }
+    
+    
+    // MARK: State Monad Functions
+    
+    private func castInput<Input, Output>(input:(Int, Any)) -> (State<TestState<Input, Output>, Input?>) {
+        return State {
+            var state = $0
+            state.currentInput = input.1
+            state.currentInputIndex = input.0
+            var uncastedInput:Any? = state.currentInput is NSNull ? nil : state.currentInput
+            
+            if let inputType = Input.self as? ExpressibleByNilLiteral.Type, uncastedInput == nil {
+                uncastedInput = inputType.init(nilLiteral: ())
             }
             
-            self.name = name
-            self.description = dictionary["description"] as? String
-            if dictionary["inputs"] is NSNull {
-                self.inputs = [NSNull()]
-            } else if let input = dictionary["inputs"] as? [Any] {
-                self.inputs = input
-            } else if let input = dictionary["inputs"] {
-                self.inputs = [input]
+            if let input = uncastedInput as? Input {
+                return (state, input)
             } else {
-                self.inputs = []
+                state.failWith(message:"The input: \(uncastedInput) for test case: \"\(state.testCase.name)\" in file: \"\(state.testSpec.sourceFile)\" did not have the expected type: \(Input.self)")
+                return (state, nil)
             }
-            self.expectedOutput = dictionary["expected-output"] is NSNull ? nil : dictionary["expected-output"]
-            self.expectedOutputType = dictionary["expected-output-type"] as? String
-            self.expectedErrorType = dictionary["expected-error-type"] as? String
         }
     }
     
+    private func failIfExpectErrorFromNonThrowingClosure<Input, Output>(input:Input?) -> (State<TestState<Input, Output>, Input?>) {
+        return State {
+            var state = $0
+            if state.testCase.expectError {
+                state.failWith(message: "The test case \"\(state.testCase.name)\" in file: \"\(state.testSpec.sourceFile)\" was specified as expecting an error for the provided input, but the test closure provided is not a throwing closure and so cannot produce any errors to validate")
+                return (state, nil)
+            }
+            
+            return (state, input)
+        }
+    }
     
-    static func runTestCases<Input, Output:TestableOutput>(file:String, testClosure:(Input) -> Output) {
-        
-        guard let url = Bundle(for:TestKitDictionary.self).url(forResource: file, withExtension: "testkit") else {
-            XCTFail("No TestKit test file was found with the name \(file).testkit")
-            return
+    private func expectErrorOrFail<Input, Output>(input:Input?) -> (State<TestState<Input, Output>, Error?>) {
+        return State {
+            var state = $0
+            guard let input = input else {
+                return (state, nil)
+            }
+            
+            if let closure = state.testClosureThrowing ?? state.testClosureThrowingOptional {
+                do {
+                    let _ = try closure(input)
+                    state.failWith(message:"The test case \"\(state.testCase.name)\" in file: \"\(state.testSpec.sourceFile)\" was specified as expecting an error for the provided input, but no error was thrown.")
+                } catch {
+                    return (state, error)
+                }
+            }
+            
+            state.failWith(message:"You found a bug in TestKit. The internal TestState was invalid because it did not contain the correct test closure.  Sorry for the inconvenience")
+            return (state, nil)
         }
-        
-        guard let data = try? Data(contentsOf:url) else {
-            XCTFail("The TestKit file named \(file).testkit could not be read")
-            return
-        }
-        
-        guard let json = try? JSONSerialization.jsonObject(with: data, options: []) else {
-            XCTFail("The TestKit file named \(file).testkit contains invalid JSON")
-            return
-        }
-        
-        guard let dictionary = json as? [String:Any] else {
-            XCTFail("The TestKit JSON file named \(file).testkit does not have a dictionary as the root element.")
-            return
-        }
-        
-        guard let array = dictionary["test-cases"] as? [[String:Any]] else {
-            XCTFail("The TestKit JSON file named \(file).testkit does not have an array of cases for the key \"test-cases\"")
-            return
-        }
-        
-        let cases = array.map{ Case(from: $0, filename: file) }
-        var failedCases = [Case]()
-        cases.forEach{
-            testCase in
-            var casePassed = true
-            testCase.inputs?.enumerated().forEach {
-                inputTuple in
-                
-                func fail(_ message:String) {
-                    XCTFail(message)
-                    failedCases.append(testCase)
-                    casePassed = false
-                    print("Test Case: \"\(testCase.name)\", input \(inputTuple.offset + 1)/\(testCase.inputs?.count ?? 0) failed")
+    }
+    
+    private func validateError<Input, Output>(error:Error?) -> (State<TestState<Input, Output>, Bool>) {
+        return State{
+            var state = $0
+            guard let error = error else {
+                return (state, false)
+            }
+            if let expectedOutput = state.testCase.expectedOutput {
+                guard let expectedOutput = expectedOutput as? TestKitDictionary else {
+                    state.failWith(message:"The test case \"\(state.testCase.name)\" in file: \"\(state.testSpec.sourceFile)\" had invalid expected output. When \"expect-error\" is true, the only valid \"expected-output\" value is a dictionary that the actual thrown error can be validated against. Please ensure that you intended this test case to throw an error, and if so, either omit the \"expected-output\" key to successfully match any error, or set the key to a dictionary value that can be validated against an error that implements the TestableError protocol")
+                    return (state, false)
                 }
                 
-                var uncheckedInput:Any? = inputTuple.element is NSNull ? nil : inputTuple.element
-                
-                if let inputType = Input.self as? ExpressibleByNilLiteral.Type, uncheckedInput == nil {
-                    uncheckedInput = inputType.init(nilLiteral: ())
-                }
-                
-                guard let input = uncheckedInput as? Input else {
-                    fail("The input: \(uncheckedInput) for test case: \"\(testCase.name)\" in file: \"\(file)\" did not have the expected type: \(Input.self)")
-                    return
-                }
-                
-                let output = testClosure(input)
-                
-                var uncheckedOutput:Any? = testCase.expectedOutput is NSNull ? nil : testCase.expectedOutput
-                uncheckedOutput = uncheckedOutput is [String:Any] ? TestKitDictionary(dictionary: uncheckedOutput as! [String:Any], file: file, testcase: testCase.name) : uncheckedOutput
-                
-                guard let expectedOutput = uncheckedOutput as? Output.ExpectedOutputType else {
-                    fail("The expectedOutput: \(uncheckedOutput) for test case: \(testCase.name) in file: \(file) did not have the expected type: \(Output.ExpectedOutputType.self)")
-                    return
-                }
-                if !output.validate(expected: expectedOutput) {
-                    fail("The output for the test case named: \"\(testCase.name)\" in file named:\"\(file)\" did not pass validation against the expected output. To debug, place a breakpoint in your validate(expected:) function implementation for the TestableOutput created in this test.")
-                    return
-                }
-                if let expectedOutput = expectedOutput as? TestKitDictionary {
+                if let testableError = error as? TestableError {
+                    if !testableError.validate(expected: expectedOutput) {
+                        state.failWith(message:"The test case \"\(state.testCase.name)\" in file: \"\(state.testSpec.sourceFile)\" produced an expected error that did not pass validation against the expected ouput specified.  To debug, place a breakpoint in the implementation of the validate(expected:) protocol method created for the thrown error.")
+                        return (state, false)
+                    }
+                    
                     if !expectedOutput.verifyAllKeysUsed() {
-                        fail("Some expected output from test case named: \"\(testCase.name)\" in file named:\"\(file)\" was not verified. Please ensure that your TestableOutput implementation of the validate(exepected:) function includes using the following untested keys from the TestKitDictionary expected ouput as part of the validation code:\(expectedOutput.unusedKeys)")
-                        return
-                    }
-                }
-                
-                print("Test Case: \"\(testCase.name)\", input \(inputTuple.offset + 1)/\(testCase.inputs?.count ?? 0) verified")
-            }
-            print("Test Case: \"\(testCase.name)\" \(casePassed ? "passed" : "failed")")
-        }
-        print("\(cases.count - failedCases.count)/\(cases.count) test cases passed for the file: \(file)")
-    }
-    
-    static func runTestCases<Input, Output:TestableOutput>(file:String, testClosure:(Input) -> Output?) {
-        
-        guard let url = Bundle(for:TestKitDictionary.self).url(forResource: file, withExtension: "testkit") else {
-            XCTFail("No TestKit test file was found with the name \(file).testkit")
-            return
-        }
-        
-        guard let data = try? Data(contentsOf:url) else {
-            XCTFail("The TestKit file named \(file).testkit could not be read")
-            return
-        }
-        
-        guard let json = try? JSONSerialization.jsonObject(with: data, options: []) else {
-            XCTFail("The TestKit file named \(file).testkit contains invalid JSON")
-            return
-        }
-        
-        guard let dictionary = json as? [String:Any] else {
-            XCTFail("The TestKit JSON file named \(file).testkit does not have a dictionary as the root element.")
-            return
-        }
-        
-        guard let array = dictionary["test-cases"] as? [[String:Any]] else {
-            XCTFail("The TestKit JSON file named \(file).testkit does not have an array of cases for the key \"test-cases\"")
-            return
-        }
-        
-        let cases = array.map{ Case(from: $0, filename: file) }
-        var failedCases = [Case]()
-        cases.forEach{
-            testCase in
-            var casePassed = true
-            testCase.inputs?.enumerated().forEach {
-                inputTuple in
-                
-                func fail(_ message:String) {
-                    XCTFail(message)
-                    failedCases.append(testCase)
-                    casePassed = false
-                    print("Test Case: \"\(testCase.name)\", input \(inputTuple.offset + 1)/\(testCase.inputs?.count ?? 0) failed")
-                }
-                
-                var uncheckedInput:Any? = inputTuple.element is NSNull ? nil : inputTuple.element
-                
-                if let inputType = Input.self as? ExpressibleByNilLiteral.Type, uncheckedInput == nil {
-                    uncheckedInput = inputType.init(nilLiteral: ())
-                }
-                
-                guard let input = uncheckedInput as? Input else {
-                    fail("The input: \(uncheckedInput) for test case: \"\(testCase.name)\" in file: \"\(file)\" did not have the expected type: \(Input.self)")
-                    return
-                }
-                
-                let output = testClosure(input)
-                
-                var uncheckedOutput:Any? = testCase.expectedOutput is NSNull ? nil : testCase.expectedOutput
-                uncheckedOutput = uncheckedOutput is [String:Any] ? TestKitDictionary(dictionary: uncheckedOutput as! [String:Any], file: file, testcase: testCase.name) : uncheckedOutput
-                
-                if let output = output {
-                    
-                    guard let expectedOutput = uncheckedOutput as? Output.ExpectedOutputType else {
-                        fail("The expectedOutput: \(uncheckedOutput) for test case: \(testCase.name) in file: \(file) did not have the expected type: \(Output.ExpectedOutputType.self)")
-                        return
+                        state.failWith(message: "Some expected output from test case named: \"\(state.testCase.name)\" in file named:\"\(state.testSpec.sourceFile)\" was not verified. Please ensure that your TestableError implementation of the validate(exepected:) function includes using the following untested keys from the TestKitDictionary expected ouput as part of the validation code:\(expectedOutput.unusedKeys)")
+                        return (state, false)
                     }
                     
-                    if (expectedOutput as Any?) != nil || (output as Any?) != nil {
-                        let validated = output.validate(expected: expectedOutput)
-                        if !validated {
-                            fail("The output for the test case named: \"\(testCase.name)\" in file named:\"\(file)\" did not pass validation against the expected output. To debug, place a breakpoint in your validate(expected:) function implementation for the TestableOutput created in this test.")
-                            return
-                        }
-                        if let expectedOutput = expectedOutput as? TestKitDictionary {
-                            if !expectedOutput.verifyAllKeysUsed() {
-                                fail("Some expected output from test case named: \"\(testCase.name)\" in file named:\"\(file)\" was not verified. Please ensure that your TestableOutput implementation of the validate(exepected:) function includes using the following untested keys from the TestKitDictionary expected ouput as part of the validation code:\(expectedOutput.unusedKeys)")
-                                return
-                            }                        }
-                    }
-                } else if uncheckedOutput != nil {
-                    fail("The output for the test case named: \"\(testCase.name)\" in file named:\"\(file)\" did not pass validation, because the returned value was nil, but the expected output specified in the test case JSON was non-nil")
-                    return
+                    return (state, true)
+                    
+                } else {
+                    state.failWith(message:"The test case \"\(state.testCase.name)\" in file: \"\(state.testSpec.sourceFile)\" resulted in an expected error that could not be validated by TestKit. Please ensure that the error thrown by the test closure you provided when calling TestKitSpec.run() conforms to the TestableError protocol, or, to match against any thrown error, remove the \"expected-output\" key from this case.")
+                    return (state, false)
                 }
-                print("Test Case: \"\(testCase.name)\", input \(inputTuple.offset + 1)/\(testCase.inputs?.count ?? 0) verified")
+            } else {
+                return (state, true)
             }
-            print("Test Case: \"\(testCase.name)\" \(casePassed ? "passed" : "failed")")
         }
-        print("\(cases.count - failedCases.count)/\(cases.count) test cases passed for the file: \(file)")
     }
     
+    private func outputForInput<Input, Output:TestableOutput>(input:Input?) -> (State<TestState<Input, Output>, Output?>) {
+        return State {
+            var state = $0
+            guard let input = input else {
+                return  (state, nil)
+            }
+            
+            if let closure = state.testClosure ?? state.testClosureOptional {
+                return (state, closure(input))
+            }
+            
+            state.failWith(message:"You found a bug in TestKit. The internal TestState was invalid because it did not contain the correct test closure.  Sorry for the inconvenience")
+            return (state, nil)
+        }
+    }
+    
+    private func validatedOutput<Input, Output:TestableOutput>(output:Output?) -> (State<TestState<Input, Output>, Output?>) {
+        return State {
+            var state = $0
+            guard let output = output else {
+                return (state, nil)
+            }
+            
+            guard let expected = state.expectedOutput else {
+                state.failWith(message: "The expectedOutput: \(state.testCase.expectedOutput) for test case: \(state.testCase.name) in file: \(state.testSpec.sourceFile) did not have the expected type: \(Output.ExpectedOutputType.self)")
+                return (state, nil)
+            }
+            
+            if !output.validate(expected: expected) {
+                state.failWith(message:"The output for the test case named: \"\(state.testCase.name)\" in file named:\"\(state.testSpec.sourceFile)\" did not pass validation against the expected output. To debug, place a breakpoint in your validate(expected:) function implementation for the TestableOutput created in this test.")
+                return (state, nil)
+            }
+            if let expectedOutput = expected as? TestKitDictionary {
+                if !expectedOutput.verifyAllKeysUsed() {
+                    state.failWith(message: "Some expected output from test case named: \"\(state.testCase.name)\" in file named:\"\(state.testSpec.sourceFile)\" was not verified. Please ensure that your TestableOutput implementation of the validate(exepected:) function includes using the following untested keys from the TestKitDictionary expected ouput as part of the validation code:\(expectedOutput.unusedKeys)")
+                    return (state, nil)
+                }
+            }
+            return (state, output)
+        }
+    }
+    
+    private func nilOptionalOutputMightBeSuccess<Input, Output:TestableOutput>(output:Output?) -> (State<TestState<Input, Output>, Bool>) {
+        return State {
+            var state = $0
+            
+            if state.testCase.expectError == true {
+                return (state, false)
+            }
+            
+            let expectedNil = state.testCase.expectedOutput == nil
+            var success = true
+            
+            if output == nil && !expectedNil {
+                success = false
+                state.failWith(message:"The output for the test case named: \"\(state.testCase.name)\" in file named:\"\(state.testSpec.sourceFile)\" did not pass validation because the returned value was nil, but the expected output specified in the test case JSON was non-nil")
+            }
+            
+            if output != nil && expectedNil {
+                success = false
+                state.failWith(message:"The output for the test case named: \"\(state.testCase.name)\" in file named:\"\(state.testSpec.sourceFile)\" did not pass validation because the returned value was not nil, but the expected output specified in the test case JSON was nil")
+            }
+            
+            return (state, success)
+        }
+    }
+    
+    private func nonNilOutputIsSuccess<Input, Output:TestableOutput>(output:Output?) -> (State<TestState<Input, Output>, Bool>) {
+        return State {
+            let success = output != nil ? true : false
+            return ($0, success)
+        }
+    }
+    
+    private func printCaseSuccess<Input, Output:TestableOutput>(success:Bool) -> (State<TestState<Input, Output>, Bool>) {
+        return State {
+            let state = $0
+            if success {
+                print("\t\t input \(state.currentInputIndex + 1)/\(state.testCase.inputs.count) verified")
+            }
+            return (state, success)
+        }
+    }
+    
+    private func printCaseFailed<Input, Output:TestableOutput>(success:Bool) -> (State<TestState<Input, Output>, Bool>) {
+        return State {
+            let state = $0
+            if !success {
+                print("\t\t input \(state.currentInputIndex + 1)/\(state.testCase.inputs.count) failed")
+            }
+            return (state, success)
+        }
+    }
+    
+}
+
+
+private class TestObserver: NSObject, XCTestObservation {
+    var failureReported = false
+    
+    func register() {
+        XCTestObservationCenter.shared().addTestObserver(self)
+    }
+    
+    func testCase(_ testCase: XCTestCase, didFailWithDescription description: String, inFile filePath: String?, atLine lineNumber: UInt) {
+        failureReported = true
+    }
+    
+    func unregister() {
+        XCTestObservationCenter.shared().removeTestObserver(self)
+    }
+}
+
+struct TestKitCase {
+    let name:String
+    let description:String?
+    let inputs:[Any]
+    let expectError:Bool
+    let expectedOutput:Any?
+    
+    fileprivate init?(from dictionary:[String: Any], file:String, fail:(TestKitFailure)->()) {
+        // name
+        if let name = dictionary["name"] as? String {
+            self.name = name
+        } else {
+            fail(TestKitFailure(message: "Missing or wrong type of value for test case name (key: \"name\") in file \(file)", file: file))
+            return nil
+        }
+        
+        // description
+        self.description = dictionary["description"] as? String
+        
+        // inputs
+        if !dictionary.keys.contains("inputs") {
+            fail(TestKitFailure(message: "Missing value for test case input (key: \"inputs\") for test case \"\(name)\" in file \(file)", file: file))
+            return nil
+        } else if dictionary["inputs"] is NSNull {
+            self.inputs = [NSNull()]
+        } else if let input = dictionary["inputs"] as? [Any] {
+            self.inputs = input
+        } else if let input = dictionary["inputs"] {
+            self.inputs = [input]
+        } else {
+            return nil
+        }
+        
+        // expectError
+        var shouldExpectError = false
+        if let expectError = dictionary["expect-error"] as? Bool {
+            shouldExpectError = expectError
+        }
+        self.expectError = shouldExpectError
+        
+        // expectedOutput
+        if !dictionary.keys.contains("expected-output") && shouldExpectError == false {
+            fail(TestKitFailure(message: "Missing value for test case expected output (key: \"expected-output\") for test case \"\(name)\" in file \(file)", file: file))
+            return nil
+        } else {
+            let expectedOutput = dictionary["expected-output"] is NSNull ? nil : dictionary["expected-output"]
+            self.expectedOutput = expectedOutput is [String:Any] ? TestKitDictionary(dictionary: expectedOutput as! [String:Any]) : expectedOutput
+        }
+    }
+}
+
+struct TestKitFailure {
+    let message:String
+    let file:String
+    let testKitCase:TestKitCase?
+    let testKitInput:Any?
+    let testOutput:Any?
+    let testError:Error?
+    
+    init(message:String, file:String, testCase:TestKitCase? = nil, input:Any? = nil, output:Any? = nil, error:Error? = nil) {
+        self.message = "TESTKIT ERROR: " + message
+        self.file = file
+        testKitCase = testCase
+        testKitInput = input
+        testOutput = output
+        testError = error
+    }
+}
+
+private struct State<StateType, ReturnType> {
+    let runState:(StateType)->(state: StateType, result: ReturnType)
+    func flatMap<NextReturnType>(_ transform:@escaping (ReturnType)->State<StateType, NextReturnType>) -> State<StateType, NextReturnType> {
+        return State<StateType, NextReturnType>{
+            let result = self.runState($0)
+            let nextState = transform(result.1)
+            return nextState.runState(result.0)
+        }
+    }
+}
+
+private struct TestState<Input, Output:TestableOutput> {
+    let testClosure:((Input)->Output)?
+    let testClosureOptional:((Input)->Output?)?
+    let testClosureThrowing:((Input) throws -> Output)?
+    let testClosureThrowingOptional:((Input) throws ->Output?)?
+    let testSpec:TestKitSpec
+    let testCase:TestKitCase
+    var currentInput:Any? = nil
+    var currentInputIndex:Int = 0
+    var casePassed = true
+    
+    
+    var expectedOutput:Output.ExpectedOutputType? {
+        if let expectedOutput = testCase.expectedOutput as? Output.ExpectedOutputType {
+            return expectedOutput
+        } else {
+            return nil
+        }
+    }
+    
+    init(testSpec:TestKitSpec, testCase:TestKitCase, testClosure:@escaping (Input)->Output) {
+        self.testSpec = testSpec
+        self.testClosure = testClosure
+        self.testClosureThrowing = nil
+        self.testClosureThrowingOptional = nil
+        self.testClosureOptional = nil
+        self.testCase = testCase
+    }
+    
+    init(testSpec:TestKitSpec, testCase:TestKitCase, testClosure:@escaping (Input)->Output?) {
+        self.testSpec = testSpec
+        self.testClosure = nil
+        self.testClosureThrowing = nil
+        self.testClosureThrowingOptional = nil
+        self.testClosureOptional = testClosure
+        self.testCase = testCase
+    }
+    
+    init(testSpec:TestKitSpec, testCase:TestKitCase, testClosure:@escaping (Input) throws -> Output) {
+        self.testSpec = testSpec
+        self.testClosureThrowing = testClosure
+        self.testClosure = nil
+        self.testClosureThrowingOptional = nil
+        self.testClosureOptional = nil
+        self.testCase = testCase
+    }
+    
+    init(testSpec:TestKitSpec, testCase:TestKitCase, testClosure:@escaping (Input) throws -> Output?) {
+        self.testSpec = testSpec
+        self.testClosure = nil
+        self.testClosureThrowing = nil
+        self.testClosureOptional = nil
+        self.testClosureThrowingOptional = testClosure
+        self.testCase = testCase
+    }
+    
+    mutating func failWith(message:String) {
+        casePassed = false
+        testSpec.fail(with: TestKitFailure(message:message + "\n", file:testSpec.sourceFile, testCase:testCase, input:currentInput))
+    }
 }
