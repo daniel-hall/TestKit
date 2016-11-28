@@ -158,13 +158,13 @@ And this test code would use the following TestKit JSON spec to achieve exactly 
 	{
 		"name" : "Missing Subjects",
 		"inputs" : ["in the pantry", "can be twelve"],
-		"expect-error" : true
+		"expect-error" : true,
 		"expected-output" : { "type": "NoSubject" }
 	},
 	{
 		"name" : "Missing Verbs",
 		"inputs" : ["The balloon good", "Dog man's best friend"],
-		"expect-error" : true
+		"expect-error" : true,
 		"expected-output" : { "type": "NoVerb" }
 	}
 ]
