@@ -1,5 +1,5 @@
 {
-"test-description": "Some description of this",
+"test-description": "Test Returning the String Names For Ints",
 "test-cases": [
 {
 "name" : "valid",

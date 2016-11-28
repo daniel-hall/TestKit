@@ -9,51 +9,35 @@
 import XCTest
 @testable import TestKitExample
 
-extension Bool : TestableOutput {
-    typealias ExpectedOutputType = Bool
-    func validate(expected output: Bool) -> Bool {
-        return self == output
-    }
-}
-
-extension String : TestableOutput {
-    typealias ExpectedOutputType = String
-    func validate(expected output: String) -> Bool {
-        return self == output
-    }
-}
-
-extension Person : TestableOutput {
-    typealias ExpectedOutputType = TestKitDictionary
-    func validate(expected output: TestKitDictionary) -> Bool {
-        guard let full = output["fullName"] as? String, let age = output["age"] as? Int, let first = output["firstName"] as? String else {
-            return false
-        }
-        return fullName == full && self.age == age && firstName == first
-    }
-}
-
 
 class TestKitExampleTests: XCTestCase {
     
-    func testIsValidInt() {
-        let spec = TestKitSpec.init(file: "IsValidInt") { XCTFail($0.message) }
+    func testIsValidPassword() {
+        let spec = TestKitSpec.init(file: "ValidPasswordTests") { XCTFail($0.message) }
         spec.run(){
-            (input:Any?) -> Bool in
-            return isValidInt(int: input)
+            (input:String) -> Bool in
+            return isValidPassword(string: input)
         }
     }
     
-    func testMatch() {
-        let spec = TestKitSpec.init(file: "MatchTest") { XCTFail($0.message) }
+    func testParseInt() {
+        let spec = TestKitSpec.init(file: "ParseIntTests") { XCTFail($0.message) }
+        spec.run(){
+            (input:[String: Any]) throws -> Int in
+            return try parseInt(from: input, key: "test-key")
+        }
+    }
+    
+    func testStringForInt() {
+        let spec = TestKitSpec.init(file: "StringForIntTests") { XCTFail($0.message) }
         spec.run(){
             (input:Int) -> String? in
-            return matchingValue(for: input)
+            return stringValue(for: input)
         }
     }
     
     func testPerson() {
-        let spec = TestKitSpec.init(file: "ValidPersonTests") { XCTFail($0.message) }
+        let spec = TestKitSpec.init(file: "PersonTests") { XCTFail($0.message) }
         spec.run(){
             (input:[String:Any]) -> Person in
             return Person(first: input["first"] as! String, last: input["last"] as! String, age:input["age"] as? Int ?? 18)
