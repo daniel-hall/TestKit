@@ -173,12 +173,12 @@ And this test code would use the following TestKit JSON spec to achieve exactly 
 
 
 
-As you can see form this example, TestKit did the following:
+As you can see from this example, TestKit did the following:
 
 - Eliminated the repetitive and boilerplate test code, and greatly reduced the total lines of code written across the boards, while still testing all the same cases
 - Made the test data much more readable and clear by structuring it and labeling simply as `name`, `inputs` and `expected-output`.  This can easily be scanned, read and understood by anyone, including developers and QA team members who don't write Swift, business analysts, etc.
 - Made it very very easy to add additional cases, or additional inputs to existing cases.  In fact, because it's so easy to do and doesn't require writing new code, TestKit actually encourages and rewards the addition of lots of new test inputs and cases.  And this makes your actual test coverage much much better.
-- Because the actual inputs and expected outputs for these tests are captured in a JSON file, the majority of unit test content can be shared across platforms, for example with Android or web client apps. If the small TestKit library itself is ported to these other platforms, the test cases can be shared and reused across all platforms, and updated in a central repository by developers and QA working on any one of the platforms.  
+- Because the inputs and expected outputs for these tests are captured in a JSON file, the majority of unit test content can be shared across platforms, for example with Android or web client apps. If the small TestKit library itself is ported to these other platforms, the test cases can be shared and reused across all platforms and updated in a central repository by developers and QA working on any one of the platforms.  
 
 
 
