@@ -16,8 +16,8 @@ Most developers want to meet these criteria, but find it hard to write clean "du
 TestKit makes things much better by:
 
 1. Defining a clear unit test structure that simplifies and templates the writing of "dumb tests"
-2. Separating the input values, and expected output values from the actual code and moving them into an external data file that can be updated by anyone without writing more code
-3. Making it so that the often-repeated code that checks the properties of an actual output against the properties of an _expected_ output is only written one time, and is reused for all validation thereafter.
+2. Separating the input values and expected output values from the actual code and moving them into an external data file that can be updated by anyone without writing more code
+3. Making it so that the often-repeated code that verifies that the properties of test output match expectations is only written one time, and is reused for all validation thereafter.
 
 #### Example 
 
