@@ -282,6 +282,10 @@ struct TestKitSpec {
             guard let error = error else {
                 return (state, false)
             }
+            guard state.testCase.expectError == true else {
+                state.failWith(message:"Input \(state.currentInputIndex + 1) of the test case \"\(state.testCase.name)\" in file: \"\(state.testSpec.sourceFile)\" resulted in an error being thrown, but the key \"expect-error\" in the TestKit spec was not set to true, so no error was expected.", error:error)
+                return (state, false)
+            }
             if let expectedOutput = state.testCase.expectedOutput {
                 guard let expectedOutput = expectedOutput as? TestKitDictionary else {
                     state.failWith(message:"The test case \"\(state.testCase.name)\" in file: \"\(state.testSpec.sourceFile)\" had invalid expected output. When \"expect-error\" is true, the only valid \"expected-output\" value is a dictionary that the actual thrown error can be validated against. Please ensure that you intended this test case to throw an error, and if so, either omit the \"expected-output\" key to successfully match any error, or set the key to a dictionary value that can be validated against an error that implements the TestableError protocol", error:error)
