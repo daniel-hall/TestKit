@@ -16,6 +16,16 @@ protocol TestableOutput {
     func validate(expected output: ExpectedOutputType) -> Bool
 }
 
+// Extension for arrays that contain TestableOutput-conforming elements, to return a validation Bool based on the validation of all contained elements.
+extension Array where Element: TestableOutput {
+    func validate(expected output: [Element.ExpectedOutputType]) -> Bool {
+        guard self.count == output.count else {
+            return false
+        }
+        return zip(self, output).reduce(true) { $0.1.0.validate(expected: $0.1.1) ? $0.0 : false }
+    }
+}
+
 /// Protocol that must be adopted by any Error being returned thrown a test closure / function under test if the TestKit spec has an expected output describing how to validate the error
 protocol TestableError {
     func validate(expected output: TestKitDictionary) -> Bool
@@ -24,9 +34,13 @@ protocol TestableError {
 /// Wrapper around a normal Swift [String: Any] dictionary that additionally tracks when its keys are accessed and can validate that all the keys of the wrapped dictionary were accessed. Any time the expected output in a TestKit spec is a dictionary, is gets converted to a TestKitDictionary for validation
 final class TestKitDictionary {
     fileprivate let dictionary: [String:Any]
+    fileprivate var subDictionaries = [(String, TestKitDictionary)]()
     fileprivate var usedKeys = [String]()
+    fileprivate var allUsedKeys:[String] {
+        return usedKeys + subDictionaries.map{ (key, dictionary) in dictionary.allUsedKeys.map{ key + "." + $0} }.joined()
+    }
     fileprivate var unusedKeys:[String] {
-        return Array(Set(dictionary.keys).subtracting(Set(usedKeys)))
+        return Array(Set(dictionary.keys).subtracting(Set(usedKeys))) + subDictionaries.reduce([]){ (result, element:(key:String, dictionary:TestKitDictionary)) in result + element.dictionary.usedKeys.map{ element.key + "." + $0 } }
     }
     
     fileprivate init(dictionary:[String: Any]) {
@@ -35,11 +49,53 @@ final class TestKitDictionary {
     
     subscript(key: String) -> Any? {
         usedKeys.append(key)
+        if let subdictionary = dictionary[key] as? [String:Any] {
+            let existing = subDictionaries.filter({ $0.0 == key }).first
+            if let existing = existing {
+                return existing
+            }
+            let new = TestKitDictionary(dictionary: subdictionary)
+            subDictionaries.append((key, new))
+            return new
+        } else if let array = dictionary[key] as? [[String:Any]]{
+            var result = [TestKitDictionary]()
+            array.enumerated().forEach {
+                index, element in
+                let existing = subDictionaries.filter({ $0.0 == "\(key)[\(index)]" }).first
+                if let existing = existing?.1 {
+                    result.append(existing)
+                } else {
+                    let new = TestKitDictionary(dictionary: element)
+                    subDictionaries.append(("\(key)[\(index)]", new))
+                    return result.append(new)
+                }
+            }
+            return result
+        }
         return dictionary[key]
     }
     
     fileprivate func verifyAllKeysUsed() -> Bool {
-        return Set(usedKeys).isSuperset(of: Array(dictionary.keys))
+        return Set(allUsedKeys).isSuperset(of: dictionary.allKeys)
+    }
+}
+
+// Add private property that returns a flattened array of all key paths in a dictionary
+private extension Dictionary {
+    var allKeys:[String] {
+        var keys = Array(self.keys.map{String(describing: $0)})
+        for (key, value) in self {
+            if let value = value as? [String:Any], let key = key as? String {
+                keys += (value.allKeys.map{key + "." + $0})
+            }
+            else if let value = value as? [[String:Any]], let key = key as? String {
+                value.enumerated().forEach {
+                    index, element in
+                    keys += (element.allKeys.map{"\(key)[\(index)]" + "." + $0})
+                }
+            }
+        }
+        return keys
     }
 }
 
@@ -130,7 +186,7 @@ struct TestKitSpec {
                 print("\n\tTESTKIT: Starting test case named:\"\(testCase.name)\"")
                 let result = testCase.inputs.enumerated().reduce(TestState<Input, Output>(testSpec:self, testCase:testCase, testClosure:testClosure)){
                     (reduceInput:(initialState:TestState<Input, Output>, input:(Int, Any))) -> TestState<Input, Output>  in
-                    return castInput(input: reduceInput.input).flatMap(failIfExpectErrorFromNonThrowingClosure).flatMap(outputForInput).flatMap(validatedOutput).flatMap(nonNilOutputIsSuccess).flatMap(printCaseSuccess).flatMap(printCaseFailed).runState(reduceInput.initialState).state
+                    return castInput(input: reduceInput.input).flatMap(failIfExpectErrorFromNonThrowingClosure).flatMap(outputForInput).flatMap(validatedOutput).flatMap(nonNilOutputIsSuccess).flatMap(printCaseSuccess).flatMap(printCaseFailed).flatMap(resetCurrentInputSuccess).runState(reduceInput.initialState).state
                 }
                 print("\tTESTKIT: The test case named:\"\(result.testCase.name)\" has \(result.casePassed ? "PASSED" : "FAILED") \n")
                 failedCases = result.casePassed ? failedCases : failedCases + 1
@@ -151,7 +207,7 @@ struct TestKitSpec {
                 print("\n\tTESTKIT: Starting test case named:\"\(testCase.name)\"")
                 let result = testCase.inputs.enumerated().reduce(TestState<Input, Output>(testSpec:self, testCase:testCase, testClosure:testClosure)){
                     (reduceInput:(initialState:TestState<Input, Output>, input:(Int, Any))) -> TestState<Input, Output>  in
-                    return castInput(input: reduceInput.input).flatMap(outputForInput).flatMap(validatedOutput).flatMap(nonNilOutputIsSuccess).flatMap(printCaseSuccess).flatMap(checkForExpectedErrorIfNotSuccess).flatMap(castInput).flatMap(expectErrorOrFail).flatMap(validateError).flatMap(printCaseSuccess).flatMap(printCaseFailed).runState(reduceInput.initialState).state
+                    return castInput(input: reduceInput.input).flatMap(outputForInput).flatMap(validatedOutput).flatMap(nonNilOutputIsSuccess).flatMap(printCaseSuccess).flatMap(checkForExpectedErrorIfNotSuccess).flatMap(castInput).flatMap(expectErrorOrFail).flatMap(validateError).flatMap(printCaseSuccess).flatMap(printCaseFailed).flatMap(resetCurrentInputSuccess).runState(reduceInput.initialState).state
                 }
                 print("\tTESTKIT: The test case named:\"\(result.testCase.name)\" has \(result.casePassed ? "PASSED" : "FAILED") \n")
                 failedCases = result.casePassed ? failedCases : failedCases + 1
@@ -173,7 +229,7 @@ struct TestKitSpec {
                 
                 let result = testCase.inputs.enumerated().reduce(TestState<Input, Output>(testSpec:self, testCase:testCase, testClosure:testClosure)){
                     (reduceInput:(initialState:TestState<Input, Output>, input:(Int, Any))) -> TestState<Input, Output>  in
-                    return castInput(input: reduceInput.input).flatMap(failIfExpectErrorFromNonThrowingClosure).flatMap(outputForInput).flatMap(validatedOutput).flatMap(nilOptionalOutputMightBeSuccess).flatMap(printCaseSuccess).flatMap(printCaseFailed).runState(reduceInput.initialState).state
+                    return castInput(input: reduceInput.input).flatMap(failIfExpectErrorFromNonThrowingClosure).flatMap(outputForInput).flatMap(validatedOutput).flatMap(nilOptionalOutputMightBeSuccess).flatMap(printCaseSuccess).flatMap(printCaseFailed).flatMap(resetCurrentInputSuccess).runState(reduceInput.initialState).state
                 }
                 print("\tTESTKIT: The test case named:\"\(result.testCase.name)\" has \(result.casePassed ? "PASSED" : "FAILED") \n")
                 failedCases = result.casePassed ? failedCases : failedCases + 1
@@ -194,7 +250,7 @@ struct TestKitSpec {
                 print("\n\tTESTKIT: Starting test case named:\"\(testCase.name)\"")
                 let result = testCase.inputs.enumerated().reduce(TestState<Input, Output>(testSpec:self, testCase:testCase, testClosure:testClosure)){
                     (reduceInput:(initialState:TestState<Input, Output>, input:(Int, Any))) -> TestState<Input, Output>  in
-                    return castInput(input: reduceInput.input).flatMap(outputForInput).flatMap(validatedOutput).flatMap(nilOptionalOutputMightBeSuccess).flatMap(printCaseSuccess).flatMap(checkForExpectedErrorIfNotSuccess).flatMap(castInput).flatMap(expectErrorOrFail).flatMap(validateError).flatMap(printCaseSuccess).flatMap(printCaseFailed).runState(reduceInput.initialState).state
+                    return castInput(input: reduceInput.input).flatMap(outputForInput).flatMap(validatedOutput).flatMap(nilOptionalOutputMightBeSuccess).flatMap(printCaseSuccess).flatMap(checkForExpectedErrorIfNotSuccess).flatMap(castInput).flatMap(expectErrorOrFail).flatMap(validateError).flatMap(printCaseSuccess).flatMap(printCaseFailed).flatMap(resetCurrentInputSuccess).runState(reduceInput.initialState).state
                 }
                 print("\tTESTKIT: The test case named:\"\(result.testCase.name)\" has \(result.casePassed ? "PASSED" : "FAILED") \n")
                 failedCases = result.casePassed ? failedCases : failedCases + 1
@@ -204,6 +260,92 @@ struct TestKitSpec {
             fail(with: TestKitFailure(message:"No valid test cases found in the file \"\(sourceFile)\". Unable to run.", file:sourceFile))
         }
     }
+    
+    func run<Input, Output:TestableOutput>(testClosure:@escaping (Input)->[Output]) {
+        if fileError { return }
+        if casesExist {
+            print("\nTESTKIT: Running tests from file: \"\(sourceFile)\"")
+            var failedCases = 0
+            testCases.forEach{
+                testCase in
+                print("\n\tTESTKIT: Starting test case named:\"\(testCase.name)\"")
+                let result = testCase.inputs.enumerated().reduce(TestState<Input, Output>(testSpec:self, testCase:testCase, testClosure:testClosure)){
+                    (reduceInput:(initialState:TestState<Input, Output>, input:(Int, Any))) -> TestState<Input, Output>  in
+                    return castInput(input: reduceInput.input).flatMap(failIfExpectErrorFromNonThrowingClosure).flatMap(arrayOutputForInput).flatMap(validatedArrayOutput).flatMap(nonNilArrayOutputIsSuccess).flatMap(printCaseSuccess).flatMap(printCaseFailed).flatMap(resetCurrentInputSuccess).runState(reduceInput.initialState).state
+                }
+                print("\tTESTKIT: The test case named:\"\(result.testCase.name)\" has \(result.casePassed ? "PASSED" : "FAILED") \n")
+                failedCases = result.casePassed ? failedCases : failedCases + 1
+            }
+            print("\nTESTKIT: \(testCases.count - failedCases)/\(testCases.count) test cases PASSED for the file: \"\(sourceFile)\" \n")
+        } else {
+            fail(with: TestKitFailure(message:"No valid test cases found in the file \"\(sourceFile)\". Unable to run. \n", file:sourceFile))
+        }
+    }
+    
+    func run<Input, Output:TestableOutput>(testClosure:@escaping (Input) throws -> [Output]) {
+        if fileError { return }
+        if casesExist {
+            print("\nTESTKIT: Running tests from file: \"\(sourceFile)\"")
+            var failedCases = 0
+            testCases.forEach{
+                testCase in
+                print("\n\tTESTKIT: Starting test case named:\"\(testCase.name)\"")
+                let result = testCase.inputs.enumerated().reduce(TestState<Input, Output>(testSpec:self, testCase:testCase, testClosure:testClosure)){
+                    (reduceInput:(initialState:TestState<Input, Output>, input:(Int, Any))) -> TestState<Input, Output>  in
+                    return castInput(input: reduceInput.input).flatMap(arrayOutputForInput).flatMap(validatedArrayOutput).flatMap(nonNilArrayOutputIsSuccess).flatMap(printCaseSuccess).flatMap(checkForExpectedErrorIfNotSuccess).flatMap(castInput).flatMap(expectErrorOrFail).flatMap(validateError).flatMap(printCaseSuccess).flatMap(printCaseFailed).flatMap(resetCurrentInputSuccess).runState(reduceInput.initialState).state
+                }
+                print("\tTESTKIT: The test case named:\"\(result.testCase.name)\" has \(result.casePassed ? "PASSED" : "FAILED") \n")
+                failedCases = result.casePassed ? failedCases : failedCases + 1
+            }
+            print("\nTESTKIT: \(testCases.count - failedCases)/\(testCases.count) test cases PASSED for the file: \"\(sourceFile)\" \n")
+        } else {
+            fail(with: TestKitFailure(message:"No valid test cases found in the file \"\(sourceFile)\". Unable to run. \n", file:sourceFile))
+        }
+    }
+    
+    func run<Input, Output:TestableOutput>(testClosure:@escaping (Input)->[Output]?) {
+        if fileError { return }
+        if casesExist {
+            print("\nTESTKIT: Running tests from file: \"\(sourceFile)\"")
+            var failedCases = 0
+            testCases.forEach{
+                testCase in
+                print("\n\tTESTKIT: Starting test case named:\"\(testCase.name)\"")
+                
+                let result = testCase.inputs.enumerated().reduce(TestState<Input, Output>(testSpec:self, testCase:testCase, testClosure:testClosure)){
+                    (reduceInput:(initialState:TestState<Input, Output>, input:(Int, Any))) -> TestState<Input, Output>  in
+                    return castInput(input: reduceInput.input).flatMap(failIfExpectErrorFromNonThrowingClosure).flatMap(arrayOutputForInput).flatMap(validatedArrayOutput).flatMap(nilArrayOptionalOutputMightBeSuccess).flatMap(printCaseSuccess).flatMap(printCaseFailed).flatMap(resetCurrentInputSuccess).runState(reduceInput.initialState).state
+                }
+                print("\tTESTKIT: The test case named:\"\(result.testCase.name)\" has \(result.casePassed ? "PASSED" : "FAILED") \n")
+                failedCases = result.casePassed ? failedCases : failedCases + 1
+            }
+            print("\nTESTKIT: \(testCases.count - failedCases)/\(testCases.count) test cases passed for the file: \"\(sourceFile)\" \n")
+        } else {
+            fail(with: TestKitFailure(message:"No valid test cases found in the file \"\(sourceFile)\". Unable to run.", file:sourceFile))
+        }
+    }
+    
+    func run<Input, Output:TestableOutput>(testClosure:@escaping (Input) throws ->[Output]?) {
+        if fileError { return }
+        if casesExist {
+            print("\nTESTKIT: Running tests from file: \"\(sourceFile)\"")
+            var failedCases = 0
+            testCases.forEach{
+                testCase in
+                print("\n\tTESTKIT: Starting test case named:\"\(testCase.name)\"")
+                let result = testCase.inputs.enumerated().reduce(TestState<Input, Output>(testSpec:self, testCase:testCase, testClosure:testClosure)){
+                    (reduceInput:(initialState:TestState<Input, Output>, input:(Int, Any))) -> TestState<Input, Output>  in
+                    return castInput(input: reduceInput.input).flatMap(arrayOutputForInput).flatMap(validatedArrayOutput).flatMap(nilArrayOptionalOutputMightBeSuccess).flatMap(printCaseSuccess).flatMap(checkForExpectedErrorIfNotSuccess).flatMap(castInput).flatMap(expectErrorOrFail).flatMap(validateError).flatMap(printCaseSuccess).flatMap(printCaseFailed).flatMap(resetCurrentInputSuccess).runState(reduceInput.initialState).state
+                }
+                print("\tTESTKIT: The test case named:\"\(result.testCase.name)\" has \(result.casePassed ? "PASSED" : "FAILED") \n")
+                failedCases = result.casePassed ? failedCases : failedCases + 1
+            }
+            print("\nTESTKIT: \(testCases.count - failedCases)/\(testCases.count) test cases passed for the file: \"\(sourceFile)\" \n")
+        } else {
+            fail(with: TestKitFailure(message:"No valid test cases found in the file \"\(sourceFile)\". Unable to run.", file:sourceFile))
+        }
+    }
+    
     
     // MARK: Fileprivate Functions
     
@@ -263,7 +405,18 @@ struct TestKitSpec {
                         state.failWith(message:"The test case \"\(state.testCase.name)\" in file: \"\(state.testSpec.sourceFile)\" was specified as expecting an error for the provided input, but no error was thrown.", output:output)
                         return (state, nil)
                     } else {
-                        state.failWith(message:"You found a bug in TestKit. The test case reached a step that handles error scenarios, but there was already successful output. Please report this issue with the failing test.  Sorry for the inconvenience")
+                        return (state, nil)
+                    }
+                } catch {
+                    return (state, error)
+                }
+            } else if let closure = state.testClosureArrayThrowing ?? state.testClosureArrayThrowingOptional {
+                do {
+                    let output = try closure(input)
+                    if state.testCase.expectError {
+                        state.failWith(message:"The test case \"\(state.testCase.name)\" in file: \"\(state.testSpec.sourceFile)\" was specified as expecting an error for the provided input, but no error was thrown.", output:output)
+                        return (state, nil)
+                    } else {
                         return (state, nil)
                     }
                 } catch {
@@ -337,6 +490,28 @@ struct TestKitSpec {
         }
     }
     
+    private func arrayOutputForInput<Input, Output:TestableOutput>(input:Input?) -> (State<TestState<Input, Output>, [Output]?>) {
+        return State {
+            var state = $0
+            guard let input = input else {
+                return  (state, nil)
+            }
+            
+            if let closure = state.testClosureArray ?? state.testClosureArrayOptional {
+                if state.testCase.expectError {
+                    state.failWith(message:"The test case \"\(state.testCase.name)\" in file: \"\(state.testSpec.sourceFile)\" indicated that an error is expected, but the test closure provided is non-throwing, so no error is possible")
+                    return (state, nil)
+                }
+                return (state, closure(input))
+            } else if let closure = state.testClosureArrayThrowing ?? state.testClosureArrayThrowingOptional {
+                return (state, (try? closure(input)) ?? nil)
+            }
+            
+            state.failWith(message:"You found a bug in TestKit. The internal TestState was invalid because it did not contain the correct test closure.  Sorry for the inconvenience")
+            return (state, nil)
+        }
+    }
+    
     private func validatedOutput<Input, Output:TestableOutput>(output:Output?) -> (State<TestState<Input, Output>, Output?>) {
         return State {
             var state = $0
@@ -361,6 +536,40 @@ struct TestKitSpec {
             if let expectedOutput = expected as? TestKitDictionary {
                 if !expectedOutput.verifyAllKeysUsed() {
                     state.failWith(message: "Some expected output from test case named: \"\(state.testCase.name)\" in file named:\"\(state.testSpec.sourceFile)\" was not verified. Please ensure that your TestableOutput implementation of the validate(exepected:) function includes using the following untested keys from the TestKitDictionary expected ouput as part of the validation code:\(expectedOutput.unusedKeys)", output:output)
+                    return (state, nil)
+                }
+            }
+            return (state, output)
+        }
+    }
+    
+    private func validatedArrayOutput<Input, Output:TestableOutput>(output:[Output]?) -> (State<TestState<Input, Output>, [Output]?>) {
+        return State {
+            var state = $0
+            
+            if state.testCase.expectError {
+                return (state, nil)
+            }
+            
+            guard let output = output else {
+                return (state, nil)
+            }
+            
+            guard let expected = state.expectedArrayOutput else {
+                state.failWith(message: "The expectedOutput: \(state.testCase.expectedOutput) for test case: \(state.testCase.name) in file: \(state.testSpec.sourceFile) did not have the expected type: \(Output.ExpectedOutputType.self)", output:output)
+                return (state, nil)
+            }
+            
+            if !output.validate(expected: expected) {
+                state.failWith(message:"The output for the test case named: \"\(state.testCase.name)\" in file named:\"\(state.testSpec.sourceFile)\" did not pass validation against the expected output. To debug, place a breakpoint in your validate(expected:) function implementation for the TestableOutput created in this test.", output:output)
+                return (state, nil)
+            }
+            
+            let expectedOutput = expected.flatMap{ $0 as? TestKitDictionary }
+            
+            if expectedOutput.count == expected.count {
+                if !expectedOutput.reduce(true){ $0.1.verifyAllKeysUsed() ? $0.0 : false } {
+                    state.failWith(message: "Some expected output from test case named: \"\(state.testCase.name)\" in file named:\"\(state.testSpec.sourceFile)\" was not verified. Please ensure that your TestableOutput implementation of the validate(exepected:) function includes using the following untested keys from the TestKitDictionary expected ouput as part of the validation code:\(expectedOutput.first!.unusedKeys)", output:output)
                     return (state, nil)
                 }
             }
@@ -393,7 +602,39 @@ struct TestKitSpec {
         }
     }
     
+    private func nilArrayOptionalOutputMightBeSuccess<Input, Output:TestableOutput>(output:[Output]?) -> (State<TestState<Input, Output>, Bool>) {
+        return State {
+            var state = $0
+            
+            if state.testCase.expectError == true {
+                return (state, false)
+            }
+            
+            let expectedNil = state.testCase.expectedOutput == nil
+            var success = true
+            
+            if output == nil && !expectedNil {
+                success = false
+                state.failWith(message:"The output for the test case named: \"\(state.testCase.name)\" in file named:\"\(state.testSpec.sourceFile)\" did not pass validation because the returned value was nil, but the expected output specified in the test case JSON was non-nil", output:output)
+            }
+            
+            if output != nil && expectedNil {
+                success = false
+                state.failWith(message:"The output for the test case named: \"\(state.testCase.name)\" in file named:\"\(state.testSpec.sourceFile)\" did not pass validation because the returned value was not nil, but the expected output specified in the test case JSON was nil", output:output)
+            }
+            
+            return (state, success)
+        }
+    }
+    
     private func nonNilOutputIsSuccess<Input, Output:TestableOutput>(output:Output?) -> (State<TestState<Input, Output>, Bool>) {
+        return State {
+            let success = output != nil ? true : false
+            return ($0, success)
+        }
+    }
+    
+    private func nonNilArrayOutputIsSuccess<Input, Output:TestableOutput>(output:[Output]?) -> (State<TestState<Input, Output>, Bool>) {
         return State {
             let success = output != nil ? true : false
             return ($0, success)
@@ -402,8 +643,9 @@ struct TestKitSpec {
     
     private func printCaseSuccess<Input, Output:TestableOutput>(success:Bool) -> (State<TestState<Input, Output>, Bool>) {
         return State {
-            let state = $0
+            var state = $0
             if success {
+                state.currentInputSucceeded = true
                 print("\t\t input \(state.currentInputIndex + 1)/\(state.testCase.inputs.count) verified")
             }
             return (state, success)
@@ -413,20 +655,28 @@ struct TestKitSpec {
     private func printCaseFailed<Input, Output:TestableOutput>(success:Bool) -> (State<TestState<Input, Output>, Bool>) {
         return State {
             let state = $0
-            if !success {
+            if !success && !state.currentInputSucceeded {
                 print("\t\t input \(state.currentInputIndex + 1)/\(state.testCase.inputs.count) failed")
             }
             return (state, success)
         }
     }
     
+    private func resetCurrentInputSuccess<Input, Output:TestableOutput>(success:Bool) -> (State<TestState<Input, Output>, Void>) {
+        return State {
+            var state = $0
+            state.currentInputSucceeded = false
+            return (state, ())
+        }
+    }
+    
     private func checkForExpectedErrorIfNotSuccess<Input, Output:TestableOutput>(success:Bool) -> (State<TestState<Input, Output>, (Int, Any)?>) {
         return State {
-        let state = $0
-        if success == true {
-            return (state, nil)
-        }
-        return (state, (state.currentInputIndex, state.currentInput))
+            let state = $0
+            if success == true {
+                return (state, nil)
+            }
+            return (state, (state.currentInputIndex, state.currentInput as Any))
         }
     }
     
@@ -496,7 +746,7 @@ struct TestKitCase {
             return nil
         } else {
             let expectedOutput = dictionary["expected-output"] is NSNull ? nil : dictionary["expected-output"]
-            self.expectedOutput = expectedOutput is [String:Any] ? TestKitDictionary(dictionary: expectedOutput as! [String:Any]) : expectedOutput
+            self.expectedOutput = expectedOutput is [String:Any] ? TestKitDictionary(dictionary: expectedOutput as! [String:Any]) : (expectedOutput is [[String:Any]] ? (expectedOutput as! [[String:Any]]).map{ TestKitDictionary(dictionary: $0) } : expectedOutput)
         }
     }
 }
@@ -538,15 +788,28 @@ private struct TestState<Input, Output:TestableOutput> {
     let testClosureOptional:((Input)->Output?)?
     let testClosureThrowing:((Input) throws -> Output)?
     let testClosureThrowingOptional:((Input) throws ->Output?)?
+    let testClosureArray:((Input)->[Output])?
+    let testClosureArrayOptional:((Input)->[Output]?)?
+    let testClosureArrayThrowing:((Input) throws -> [Output])?
+    let testClosureArrayThrowingOptional:((Input) throws ->[Output]?)?
     let testSpec:TestKitSpec
     let testCase:TestKitCase
     var currentInput:Any? = nil
     var currentInputIndex:Int = 0
     var casePassed = true
+    var currentInputSucceeded = false
     
     
     var expectedOutput:Output.ExpectedOutputType? {
         if let expectedOutput = testCase.expectedOutput as? Output.ExpectedOutputType {
+            return expectedOutput
+        } else {
+            return nil
+        }
+    }
+    
+    var expectedArrayOutput:[Output.ExpectedOutputType]? {
+        if let expectedOutput = testCase.expectedOutput as? [Output.ExpectedOutputType] {
             return expectedOutput
         } else {
             return nil
@@ -559,6 +822,10 @@ private struct TestState<Input, Output:TestableOutput> {
         self.testClosureThrowing = nil
         self.testClosureThrowingOptional = nil
         self.testClosureOptional = nil
+        self.testClosureArray = nil
+        self.testClosureArrayOptional = nil
+        self.testClosureArrayThrowing = nil
+        self.testClosureArrayThrowingOptional = nil
         self.testCase = testCase
     }
     
@@ -568,6 +835,10 @@ private struct TestState<Input, Output:TestableOutput> {
         self.testClosureThrowing = nil
         self.testClosureThrowingOptional = nil
         self.testClosureOptional = testClosure
+        self.testClosureArray = nil
+        self.testClosureArrayOptional = nil
+        self.testClosureArrayThrowing = nil
+        self.testClosureArrayThrowingOptional = nil
         self.testCase = testCase
     }
     
@@ -577,6 +848,10 @@ private struct TestState<Input, Output:TestableOutput> {
         self.testClosure = nil
         self.testClosureThrowingOptional = nil
         self.testClosureOptional = nil
+        self.testClosureArray = nil
+        self.testClosureArrayOptional = nil
+        self.testClosureArrayThrowing = nil
+        self.testClosureArrayThrowingOptional = nil
         self.testCase = testCase
     }
     
@@ -586,6 +861,62 @@ private struct TestState<Input, Output:TestableOutput> {
         self.testClosureThrowing = nil
         self.testClosureOptional = nil
         self.testClosureThrowingOptional = testClosure
+        self.testClosureArray = nil
+        self.testClosureArrayOptional = nil
+        self.testClosureArrayThrowing = nil
+        self.testClosureArrayThrowingOptional = nil
+        self.testCase = testCase
+    }
+    
+    init(testSpec:TestKitSpec, testCase:TestKitCase, testClosure:@escaping (Input)->[Output]) {
+        self.testSpec = testSpec
+        self.testClosure = nil
+        self.testClosureThrowing = nil
+        self.testClosureThrowingOptional = nil
+        self.testClosureOptional = nil
+        self.testClosureArray = testClosure
+        self.testClosureArrayOptional = nil
+        self.testClosureArrayThrowing = nil
+        self.testClosureArrayThrowingOptional = nil
+        self.testCase = testCase
+    }
+    
+    init(testSpec:TestKitSpec, testCase:TestKitCase, testClosure:@escaping (Input)->[Output]?) {
+        self.testSpec = testSpec
+        self.testClosure = nil
+        self.testClosureThrowing = nil
+        self.testClosureThrowingOptional = nil
+        self.testClosureOptional = nil
+        self.testClosureArray = nil
+        self.testClosureArrayOptional = testClosure
+        self.testClosureArrayThrowing = nil
+        self.testClosureArrayThrowingOptional = nil
+        self.testCase = testCase
+    }
+    
+    init(testSpec:TestKitSpec, testCase:TestKitCase, testClosure:@escaping (Input) throws -> [Output]) {
+        self.testSpec = testSpec
+        self.testClosureThrowing = nil
+        self.testClosure = nil
+        self.testClosureThrowingOptional = nil
+        self.testClosureOptional = nil
+        self.testClosureArray = nil
+        self.testClosureArrayOptional = nil
+        self.testClosureArrayThrowing = testClosure
+        self.testClosureArrayThrowingOptional = nil
+        self.testCase = testCase
+    }
+    
+    init(testSpec:TestKitSpec, testCase:TestKitCase, testClosure:@escaping (Input) throws -> [Output]?) {
+        self.testSpec = testSpec
+        self.testClosure = nil
+        self.testClosureThrowing = nil
+        self.testClosureOptional = nil
+        self.testClosureThrowingOptional = nil
+        self.testClosureArray = nil
+        self.testClosureArrayOptional = nil
+        self.testClosureArrayThrowing = nil
+        self.testClosureArrayThrowingOptional = testClosure
         self.testCase = testCase
     }
     
