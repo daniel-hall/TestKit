@@ -1,0 +1,10 @@
+framework module TestKit {
+  umbrella header "TestKit.h"
+
+  export *
+  module * { export * }
+}
+
+module TestKit.Swift {
+    header "TestKit-Swift.h"
+}
