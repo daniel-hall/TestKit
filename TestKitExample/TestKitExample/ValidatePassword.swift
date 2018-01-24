@@ -10,7 +10,7 @@ import Foundation
 
 func validatePassword(_ password:String) -> Bool {
     // At least 8 characters
-    guard password.characters.count >= 8 else {
+    guard password.count >= 8 else {
         return false
     }
     // Mix of upper and lower case letters

@@ -21,7 +21,7 @@ class LogInViewController: UIViewController, UITextFieldDelegate {
     }
 
     func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
-         loginButton.isEnabled = usernameField.text?.isEmpty == false && passwordField.text?.isEmpty == false && !(textField.text?.characters.count == 1 && string.isEmpty)
+         loginButton.isEnabled = usernameField.text?.isEmpty == false && passwordField.text?.isEmpty == false && !(textField.text?.count == 1 && string.isEmpty)
         return true
     }
     
