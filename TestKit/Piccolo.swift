@@ -2,7 +2,7 @@
 //  Piccolo.swift
 //  Piccolo
 //
-// Copyright (c) 2017 Daniel Hall
+// Copyright (c) 2018 Daniel Hall
 // Twitter: @_danielhall
 // GitHub: https://github.com/daniel-hall
 // Website: http://danielhall.io
@@ -112,7 +112,7 @@ public func parse(gherkin:String) throws -> Feature {
     
     func parseTagName(success: ((String) throws -> ())? = nil) throws -> Bool {
         if let range = currentLine.range(of:"(?<=^@)\\w+$", options: .regularExpression) {
-            try success?(currentLine.substring(with: range).trimmingCharacters(in: .whitespaces))
+            try success?(currentLine[range].trimmingCharacters(in: .whitespaces))
             return true
         }
         if currentLine.hasPrefix("@") {
@@ -123,7 +123,7 @@ public func parse(gherkin:String) throws -> Feature {
     
     func parseFeatureName(success: ((String) throws -> ())? = nil) throws -> Bool {
         if let range = currentLine.range(of:"(?<=^feature:)\\s*\\S+.*$", options: [.regularExpression, .caseInsensitive]) {
-            try success?(currentLine.substring(with: range).trimmingCharacters(in: .whitespaces))
+            try success?(currentLine[range].trimmingCharacters(in: .whitespaces))
             return true
         }
         return false
@@ -153,7 +153,7 @@ public func parse(gherkin:String) throws -> Feature {
     
     func parseGiven(success: ((String) throws -> ())? = nil) throws -> Bool {
         if let range = currentLine.range(of:"(?<=^given ).*$", options: [.regularExpression, .caseInsensitive]) {
-            try success?(currentLine.substring(with: range).trimmingCharacters(in: .whitespaces))
+            try success?(currentLine[range].trimmingCharacters(in: .whitespaces))
             return true
         }
         return false
@@ -161,11 +161,11 @@ public func parse(gherkin:String) throws -> Feature {
     
     func parseAndOrBut(success: ((String) throws -> ())? = nil) throws -> Bool {
         if let range = currentLine.range(of:"(?<=^and ).*$", options: [.regularExpression, .caseInsensitive]) {
-            try success?(currentLine.substring(with: range))
+            try success?(String(currentLine[range]))
             return true
         }
         if let range = currentLine.range(of:"(?<=^but ).*$", options: [.regularExpression, .caseInsensitive]) {
-            try success?(currentLine.substring(with: range))
+            try success?(String(currentLine[range]))
             return true
         }
         return false
@@ -173,7 +173,7 @@ public func parse(gherkin:String) throws -> Feature {
     
     func parseWhen(success: ((String)throws  -> ())? = nil) throws -> Bool {
         if let range = currentLine.range(of:"(?<=^when ).*$", options: [.regularExpression, .caseInsensitive]) {
-            try success?(currentLine.substring(with: range))
+            try success?(String(currentLine[range]))
             return true
         }
         return false
@@ -181,7 +181,7 @@ public func parse(gherkin:String) throws -> Feature {
     
     func parseThen(success: ((String) throws -> ())? = nil) throws -> Bool {
         if let range = currentLine.range(of:"(?<=^then ).*$", options: [.regularExpression, .caseInsensitive]) {
-            try success?(currentLine.substring(with: range))
+            try success?(String(currentLine[range]))
             return true
         }
         return false
@@ -214,8 +214,8 @@ public func parse(gherkin:String) throws -> Feature {
                     throw PiccoloParseError(lineNumber: currentLineNumber, description: "Mismatch in number of columns in this Data Table Row")
                 }
                 dataTable.append(row.enumerated().reduce([:]){
-                    var dictionary = $0.0
-                    dictionary[dataTableHeaders[$0.1.offset]] = $0.1.element
+                    var dictionary = $0
+                    dictionary[dataTableHeaders[$1.offset]] = $1.element
                     return dictionary
                     }
                 )
@@ -235,7 +235,7 @@ public func parse(gherkin:String) throws -> Feature {
     
     func parseScenarioOutlineName(success: ((String) throws -> ())? = nil) throws -> Bool {
         if let range = currentLine.range(of:"(?<=^scenario outline:)\\s*\\S+.*$", options: [.regularExpression, .caseInsensitive]) {
-            try success?(currentLine.substring(with: range).trimmingCharacters(in: .whitespaces))
+            try success?(currentLine[range].trimmingCharacters(in: .whitespaces))
             return true
         }
         return false
@@ -251,7 +251,7 @@ public func parse(gherkin:String) throws -> Feature {
     
     func parseScenarioName(success: ((String) throws -> ())? = nil) throws -> Bool {
         if let range = currentLine.range(of:"(?<=^scenario:)\\s*\\S+.*$", options: [.regularExpression, .caseInsensitive]) {
-            try success?(currentLine.substring(with: range).trimmingCharacters(in: .whitespaces))
+            try success?(currentLine[range].trimmingCharacters(in: .whitespaces))
             return true
         }
         return false
@@ -327,13 +327,17 @@ public func parse(gherkin:String) throws -> Feature {
         givens = []
         whens = []
         thens = []
+        stepDescription = ""
+        dataTableHeaders = []
+        dataTable = []
+        docString = ""
         return generatedScenarios
     }
     
     func finalizeScenarioOrScenarioOrOutline() throws -> () {
         guard !scenarioName.isEmpty else { return }
-        try thens.append(finalizeStep())
         if context == .parsingScenarioThen {
+            try thens.append(finalizeStep())
             try scenarios.append(finalizeScenario())
         } else {
             try scenarios += finalizeScenarioOutline()

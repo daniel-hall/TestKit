@@ -18,9 +18,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
         // If this process was launched by TestKit, load the unit test bundle and initialize its principlat class (TestKit)
-        if ProcessInfo.processInfo.arguments.contains("RunTestKit") {
-            _ = (Bundle(path: "\(Bundle.main.builtInPlugInsPath!)/TestKitExampleTests.xctest")?.principalClass as? NSObject.Type)?.init()
-        }
+        Bundle(path: ProcessInfo.processInfo.environment["TestKitUnitTestBundlePath"] ?? "")?.load()
+        _ = (NSClassFromString("TestKit.TestKit") as AnyObject?)?.perform(Selector(("startup")))
         return true
     }
 

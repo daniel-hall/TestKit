@@ -7,4 +7,5 @@ framework module TestKit {
 
 module TestKit.Swift {
     header "TestKit-Swift.h"
+    requires objc
 }

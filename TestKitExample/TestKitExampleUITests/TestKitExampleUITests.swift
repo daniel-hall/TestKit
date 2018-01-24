@@ -12,6 +12,7 @@ import TestKit
 class TestKitExampleUITests: XCTestCase {
     
     func testExample() {
+        
         testFeature(name: "Example")
     }
     

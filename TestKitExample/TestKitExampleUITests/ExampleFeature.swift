@@ -43,24 +43,25 @@ class ExampleFeature: TestKitFeature {
     }
     
     override static func registerStepHandlers() {
-        TestKit.given("I launch the app") {
+        
+        given("I launch the app") {
             _ in
             XCUIApplication().launchWithTestKitEnabled()
         }
         
-        TestKit.when("I tap the <buttonTitle> button$") {
+        when("I tap the <buttonTitle> button$") {
             try tapButton($0.matchedValues["buttonTitle"])
         }
         
-        TestKit.when("I enter the username <username>") {
+        when("I enter the username <username>") {
             enterUsername($0.matchedValues["username"])
         }
         
-        TestKit.when("I enter the password <password>") {
+        when("I enter the password <password>") {
             enterPassword($0.matchedValues["password"])
         }
         
-        TestKit.when("I log in as user <username> with password <password>") {
+        when("I log in as user <username> with password <password>") {
             enterUsername($0.matchedValues["username"])
             enterPassword($0.matchedValues["password"])
             try tapButton("Log In")

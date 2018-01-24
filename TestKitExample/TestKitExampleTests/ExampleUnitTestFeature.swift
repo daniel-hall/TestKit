@@ -25,7 +25,7 @@ extension Bool: TestKitUnitTestOutput {
 
 class ExampleUnitTestFeature: TestKitFeature {
     override static func registerStepHandlers() {
-        TestKit.when("I call the function validatePassword") {
+        when("I call the function validatePassword") {
             _ in
             UnitTestFeature.output = validatePassword(UnitTestFeature.input!.value)
         }

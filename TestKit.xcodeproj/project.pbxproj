@@ -6,38 +6,20 @@
 	objectVersion = 46;
 	objects = {
 
-/* Begin PBXAggregateTarget section */
-		CE66EE5B1ED25B3F00051BA7 /* TestKitUniversalFramework */ = {
-			isa = PBXAggregateTarget;
-			buildConfigurationList = CE66EE5C1ED25B3F00051BA7 /* Build configuration list for PBXAggregateTarget "TestKitUniversalFramework" */;
-			buildPhases = (
-				CE66EE611ED25B5C00051BA7 /* ShellScript */,
-			);
-			dependencies = (
-				CE66EE601ED25B5800051BA7 /* PBXTargetDependency */,
-			);
-			name = TestKitUniversalFramework;
-			productName = TestKitUniversalFramework;
-		};
-/* End PBXAggregateTarget section */
-
 /* Begin PBXBuildFile section */
 		CE66EE0D1ED258CE00051BA7 /* TestKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE66EE031ED258CE00051BA7 /* TestKit.framework */; };
 		CE66EE121ED258CE00051BA7 /* TestKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE66EE111ED258CE00051BA7 /* TestKitTests.swift */; };
 		CE66EE141ED258CE00051BA7 /* TestKit.h in Headers */ = {isa = PBXBuildFile; fileRef = CE66EE061ED258CE00051BA7 /* TestKit.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		CE66EE591ED259AC00051BA7 /* Piccolo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE66EE571ED259AC00051BA7 /* Piccolo.swift */; };
 		CE66EE5A1ED259AC00051BA7 /* TestKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE66EE581ED259AC00051BA7 /* TestKit.swift */; };
+		D7080DEA20180D65001C937C /* UnitTestFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7080DE920180D65001C937C /* UnitTestFeature.swift */; };
+		D7080DEC20180E07001C937C /* TestKitFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7080DEB20180E07001C937C /* TestKitFeature.swift */; };
+		D732D3FF2016954300723E46 /* XCTestExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D732D3FE2016954300723E46 /* XCTestExtensions.swift */; };
+		D732D4012016985700723E46 /* StepHandling.swift in Sources */ = {isa = PBXBuildFile; fileRef = D732D4002016985700723E46 /* StepHandling.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		CE66EE0E1ED258CE00051BA7 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = CE66EDFA1ED258CE00051BA7 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = CE66EE021ED258CE00051BA7;
-			remoteInfo = TestKit;
-		};
-		CE66EE5F1ED25B5800051BA7 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = CE66EDFA1ED258CE00051BA7 /* Project object */;
 			proxyType = 1;
@@ -55,6 +37,10 @@
 		CE66EE131ED258CE00051BA7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CE66EE571ED259AC00051BA7 /* Piccolo.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Piccolo.swift; sourceTree = "<group>"; };
 		CE66EE581ED259AC00051BA7 /* TestKit.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestKit.swift; sourceTree = "<group>"; };
+		D7080DE920180D65001C937C /* UnitTestFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnitTestFeature.swift; sourceTree = "<group>"; };
+		D7080DEB20180E07001C937C /* TestKitFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestKitFeature.swift; sourceTree = "<group>"; };
+		D732D3FE2016954300723E46 /* XCTestExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XCTestExtensions.swift; sourceTree = "<group>"; };
+		D732D4002016985700723E46 /* StepHandling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StepHandling.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -99,6 +85,10 @@
 			children = (
 				CE66EE571ED259AC00051BA7 /* Piccolo.swift */,
 				CE66EE581ED259AC00051BA7 /* TestKit.swift */,
+				D7080DEB20180E07001C937C /* TestKitFeature.swift */,
+				D7080DE920180D65001C937C /* UnitTestFeature.swift */,
+				D732D4002016985700723E46 /* StepHandling.swift */,
+				D732D3FE2016954300723E46 /* XCTestExtensions.swift */,
 				CE66EE061ED258CE00051BA7 /* TestKit.h */,
 				CE66EE071ED258CE00051BA7 /* Info.plist */,
 			);
@@ -171,23 +161,19 @@
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 0830;
-				LastUpgradeCheck = 0830;
+				LastUpgradeCheck = 0920;
 				ORGANIZATIONNAME = "Daniel Hall";
 				TargetAttributes = {
 					CE66EE021ED258CE00051BA7 = {
 						CreatedOnToolsVersion = 8.3.2;
 						DevelopmentTeam = XN5NUHVH4V;
-						LastSwiftMigration = 0830;
+						LastSwiftMigration = 0920;
 						ProvisioningStyle = Automatic;
 					};
 					CE66EE0B1ED258CE00051BA7 = {
 						CreatedOnToolsVersion = 8.3.2;
 						DevelopmentTeam = XN5NUHVH4V;
-						ProvisioningStyle = Automatic;
-					};
-					CE66EE5B1ED25B3F00051BA7 = {
-						CreatedOnToolsVersion = 8.3.2;
-						DevelopmentTeam = XN5NUHVH4V;
+						LastSwiftMigration = 0920;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -206,7 +192,6 @@
 			targets = (
 				CE66EE021ED258CE00051BA7 /* TestKit */,
 				CE66EE0B1ED258CE00051BA7 /* TestKitTests */,
-				CE66EE5B1ED25B3F00051BA7 /* TestKitUniversalFramework */,
 			);
 		};
 /* End PBXProject section */
@@ -228,28 +213,16 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
-/* Begin PBXShellScriptBuildPhase section */
-		CE66EE611ED25B5C00051BA7 /* ShellScript */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "#!/bin/sh\n\nUNIVERSAL_OUTPUTFOLDER=${BUILD_DIR}/${CONFIGURATION}-universal\n\n# make sure the output directory exists\nmkdir -p \"${UNIVERSAL_OUTPUTFOLDER}\"\n\n# Step 1. Build Device and Simulator versions\nxcodebuild -target \"${PROJECT_NAME}\" ONLY_ACTIVE_ARCH=NO -configuration ${CONFIGURATION} -sdk iphoneos  BUILD_DIR=\"${BUILD_DIR}\" BUILD_ROOT=\"${BUILD_ROOT}\" clean build\nxcodebuild -target \"${PROJECT_NAME}\" -configuration ${CONFIGURATION} -sdk iphonesimulator ONLY_ACTIVE_ARCH=NO BUILD_DIR=\"${BUILD_DIR}\" BUILD_ROOT=\"${BUILD_ROOT}\" clean build\n\n# Step 2. Copy the framework structure (from iphoneos build) to the universal folder\ncp -R \"${BUILD_DIR}/${CONFIGURATION}-iphoneos/${PROJECT_NAME}.framework\" \"${UNIVERSAL_OUTPUTFOLDER}/\"\n\n# Step 3. Copy Swift modules from iphonesimulator build (if it exists) to the copied framework directory\nSIMULATOR_SWIFT_MODULES_DIR=\"${BUILD_DIR}/${CONFIGURATION}-iphonesimulator/${PROJECT_NAME}.framework/Modules/${PROJECT_NAME}.swiftmodule/.\"\nif [ -d \"${SIMULATOR_SWIFT_MODULES_DIR}\" ]; then\ncp -R \"${SIMULATOR_SWIFT_MODULES_DIR}\" \"${UNIVERSAL_OUTPUTFOLDER}/${PROJECT_NAME}.framework/Modules/${PROJECT_NAME}.swiftmodule\"\nfi\n\n# Step 4. Create universal binary file using lipo and place the combined executable in the copied framework directory\nlipo -create -output \"${UNIVERSAL_OUTPUTFOLDER}/${PROJECT_NAME}.framework/${PROJECT_NAME}\" \"${BUILD_DIR}/${CONFIGURATION}-iphonesimulator/${PROJECT_NAME}.framework/${PROJECT_NAME}\" \"${BUILD_DIR}/${CONFIGURATION}-iphoneos/${PROJECT_NAME}.framework/${PROJECT_NAME}\"\n\n# Step 5. Convenience step to copy the framework to the project's directory\ncp -R \"${UNIVERSAL_OUTPUTFOLDER}/${PROJECT_NAME}.framework\" \"${PROJECT_DIR}\"\n\n# Step 6. Convenience step to open the project's directory in Finder\nopen \"${PROJECT_DIR}\"";
-		};
-/* End PBXShellScriptBuildPhase section */
-
 /* Begin PBXSourcesBuildPhase section */
 		CE66EDFE1ED258CE00051BA7 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D732D3FF2016954300723E46 /* XCTestExtensions.swift in Sources */,
+				D7080DEC20180E07001C937C /* TestKitFeature.swift in Sources */,
+				D7080DEA20180D65001C937C /* UnitTestFeature.swift in Sources */,
 				CE66EE5A1ED259AC00051BA7 /* TestKit.swift in Sources */,
+				D732D4012016985700723E46 /* StepHandling.swift in Sources */,
 				CE66EE591ED259AC00051BA7 /* Piccolo.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -270,11 +243,6 @@
 			target = CE66EE021ED258CE00051BA7 /* TestKit */;
 			targetProxy = CE66EE0E1ED258CE00051BA7 /* PBXContainerItemProxy */;
 		};
-		CE66EE601ED25B5800051BA7 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = CE66EE021ED258CE00051BA7 /* TestKit */;
-			targetProxy = CE66EE5F1ED25B5800051BA7 /* PBXContainerItemProxy */;
-		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -288,7 +256,9 @@
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
@@ -296,7 +266,11 @@
 				CLANG_WARN_ENUM_CONVERSION = YES;
 				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
@@ -342,7 +316,9 @@
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
@@ -350,7 +326,11 @@
 				CLANG_WARN_ENUM_CONVERSION = YES;
 				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
 				CLANG_WARN_SUSPICIOUS_MOVE = YES;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
@@ -407,7 +387,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 3.0;
+				SWIFT_VERSION = 4.0;
 			};
 			name = Debug;
 		};
@@ -438,7 +418,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = io.danielhall.TestKit;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 3.0;
+				SWIFT_VERSION = 4.0;
 			};
 			name = Release;
 		};
@@ -451,7 +431,8 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = io.danielhall.TestKitTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 3.0;
+				SWIFT_SWIFT3_OBJC_INFERENCE = On;
+				SWIFT_VERSION = 4.0;
 			};
 			name = Debug;
 		};
@@ -464,23 +445,8 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = io.danielhall.TestKitTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 3.0;
-			};
-			name = Release;
-		};
-		CE66EE5D1ED25B3F00051BA7 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				DEVELOPMENT_TEAM = XN5NUHVH4V;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-			};
-			name = Debug;
-		};
-		CE66EE5E1ED25B3F00051BA7 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				DEVELOPMENT_TEAM = XN5NUHVH4V;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_SWIFT3_OBJC_INFERENCE = On;
+				SWIFT_VERSION = 4.0;
 			};
 			name = Release;
 		};
@@ -503,6 +469,7 @@
 				CE66EE191ED258CE00051BA7 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		CE66EE1A1ED258CE00051BA7 /* Build configuration list for PBXNativeTarget "TestKitTests" */ = {
 			isa = XCConfigurationList;
@@ -511,14 +478,7 @@
 				CE66EE1C1ED258CE00051BA7 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-		};
-		CE66EE5C1ED25B3F00051BA7 /* Build configuration list for PBXAggregateTarget "TestKitUniversalFramework" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				CE66EE5D1ED25B3F00051BA7 /* Debug */,
-				CE66EE5E1ED25B3F00051BA7 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

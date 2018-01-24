@@ -41,8 +41,9 @@ var screenTable: [String: UIViewController.Type] = [
 
 class ExampleFeature: TestKitFeature {
     override static func registerStepHandlers() {
-        TestKit.then("the <buttonIdentifier> button is disabled") {
-            guard let button = TestKit.views(ofType: UIButton.self, accessibilityIdentifier: $0.matchedValues["buttonIdentifier"]).first else {
+        
+        then("the <buttonIdentifier> button is disabled") {
+            guard let button = views(ofType: UIButton.self, accessibilityIdentifier: $0.matchedValues["buttonIdentifier"]).first else {
                 throw NSError(description: "Couldn't find button in current view hierarchy with the accessibility identifier '\($0.matchedValues["buttonIdentifier"])'")
             }
             guard button.isEnabled == false else {
@@ -50,8 +51,8 @@ class ExampleFeature: TestKitFeature {
             }
         }
         
-        TestKit.then("the <buttonIdentifier> button is enabled") {
-            guard let button = TestKit.views(ofType: UIButton.self, accessibilityIdentifier: $0.matchedValues["buttonIdentifier"]).first else {
+        then("the <buttonIdentifier> button is enabled") {
+            guard let button = views(ofType: UIButton.self, accessibilityIdentifier: $0.matchedValues["buttonIdentifier"]).first else {
                 throw NSError(description: "Couldn't find button in current view hierarchy with the accessibility identifier '\($0.matchedValues["buttonIdentifier"])'")
             }
             guard button.isEnabled else {
@@ -59,8 +60,8 @@ class ExampleFeature: TestKitFeature {
             }
         }
         
-        TestKit.then("the <buttonIdentifier> button color is <buttonColor>") {
-            guard let button = TestKit.views(ofType: UIButton.self, accessibilityIdentifier: $0.matchedValues["buttonIdentifier"]).first else {
+        then("the <buttonIdentifier> button color is <buttonColor>") {
+            guard let button = views(ofType: UIButton.self, accessibilityIdentifier: $0.matchedValues["buttonIdentifier"]).first else {
                 throw NSError(description: "Couldn't find button in current view hierarchy with the accessibility identifier '\($0.matchedValues["buttonIdentifier"])'")
             }
             guard button.currentTitleColor == colorTable[$0.matchedValues["buttonColor"]] else {
@@ -68,7 +69,7 @@ class ExampleFeature: TestKitFeature {
             }
         }
         
-        TestKit.then("isLoggedIn is <trueOrFalse>") {
+        then("isLoggedIn is <trueOrFalse>") {
             switch $0.matchedValues["trueOrFalse"] {
             case "true":
                 guard isLoggedIn == true else { throw NSError(description: "isLogged in was false, not true") }
@@ -79,7 +80,7 @@ class ExampleFeature: TestKitFeature {
             }
         }
         
-        TestKit.then("I am on the <screenName> screen") {
+        then("I am on the <screenName> screen") {
             guard let topViewController = UIApplication.shared.delegate?.window??.rootViewController?.topmostViewController ?? nil else {
                 throw NSError(description: "Couldn't get root view controller")
             }
