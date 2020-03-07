@@ -101,7 +101,7 @@ public class TestExecution: NSObject, XCTestObservation {
     private func nextExample() {
         if let nextExample = remainingExamples.popLast() {
             currentExample = nextExample
-            app = XCUIApplication()
+            app = isUITest ? XCUIApplication() : nil
             let tags = Array(Set((currentExample?.tags + currentRule?.tags + feature.tags) ?? []))
             if let tagExpression = tagExpression, !tagExpression.matches(tags) {
                 let description = "Example: [SKIPPED] \(currentExample?.description.map{ $0.suffix(from: $0.lowercased().range(of: "example")?.upperBound ?? $0.startIndex).drop{ $0 == " " || $0 == ":" } } ?? "" )"

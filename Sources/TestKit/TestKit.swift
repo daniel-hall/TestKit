@@ -8,7 +8,13 @@
 import XCTest
 
 public var app: XCUIApplication!
+
 internal var registeredStepDefinitions = [StepDefinition]()
+
+internal var isUITest: Bool {
+    return ProcessInfo.processInfo.processName == "XCTRunner" || ProcessInfo.processInfo.processName.hasSuffix("-Runner")
+}
+
 private var hasTestKitStarted = false
 
 

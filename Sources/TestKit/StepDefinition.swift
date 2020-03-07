@@ -18,7 +18,6 @@ public struct StepDefinition {
     }
 }
 
-
 public struct StepDefinitionInput {
     private let result: NSTextCheckingResult
     public let step: Gherkin.Feature.Step
