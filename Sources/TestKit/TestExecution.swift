@@ -4,6 +4,24 @@
 //
 //  Created by Hall, Daniel on 7/12/19.
 //
+//  Permission is hereby granted, free of charge, to any person obtaining a copy
+//  of this software and associated documentation files (the "Software"), to deal
+//  in the Software without restriction, including without limitation the rights
+//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//  copies of the Software, and to permit persons to whom the Software is
+//  furnished to do so, subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
+//
 
 import XCTest
 
@@ -32,6 +50,8 @@ public class TestExecution: NSObject, XCTestObservation {
     
     private var ruleExpectation: XCTestExpectation?
     private var exampleExpectation: XCTestExpectation?
+
+    private var beforeEachExample: ((Gherkin.Feature.Example) -> Void)?
     
     
     public init(feature: Gherkin.Feature, stepDefinitions: [StepDefinition], tagExpression: TagExpression? = nil) {
@@ -47,10 +67,11 @@ public class TestExecution: NSObject, XCTestObservation {
         }
     }
     
-    public func run(timeout: TimeInterval = 300, continueAfterFailure: Bool = false) {
+    public func run(timeout: TimeInterval = 300, continueAfterFailure: Bool = false, beforeEachExample: ((Gherkin.Feature.Example) -> Void)?) {
         guard TestExecution.current == nil else { fatalError("Can't start running a TextExecution when there is already one running") }
         TestExecution.current = self
         self.continueAfterFailure = continueAfterFailure
+        self.beforeEachExample = beforeEachExample
         XCTestObservationCenter.shared.addTestObserver(self)
         XCTContext.runActivity(named: feature.description ?? "Feature") {
             _ in
@@ -112,6 +133,7 @@ public class TestExecution: NSObject, XCTestObservation {
             }
             remainingSteps = ((feature.background?.steps ?? []) + (currentExample?.steps ?? [])).reversed()
             var result = XCTWaiter.Result.completed
+            currentExample.map { beforeEachExample?($0) }
             XCTContext.runActivity(named: currentExample?.description ?? "Example") {
                 _ in
                 self.exampleExpectation = XCTestExpectation()
