@@ -25,9 +25,9 @@ Step handlers are also written inside of your test target, not in your productio
 An example of a step handler in TestKit for the above scenario could look this:
 
 ```
-TestKit.given("I am a user named <userName> with a $<dollarAmount> balance on my account") {
-   let userName: String = $0.matchingValues["userName"]
-   let balance: Float = ($0.matchingValues["dollarAmount"] as NSString).floatValue
+TestKit.given("I am a user named (?<userName>.*) with a $(?<dollarAmount>.*) balance on my account") {
+   let userName: String = $0["userName"]
+   let balance: Float = ($0["dollarAmount"] as NSString).floatValue
    let user = User(name: userName)
    user.currentBalance = balance
    User.setCurrentUser(to: user) 
@@ -52,7 +52,7 @@ For more examples of how to write scenarios and step handlers, open and examine 
 
 # Installation
 
-TestKit is installed as a Swift dynamic framework, and is only added to the test targets of your application (not the main executable target).  
+Add TestKit as a dependency for your test target only (not the actual app or framework target) using Swift Package Manager.
 
 ## Adding a Test Case
 
@@ -67,23 +67,6 @@ TestKit is installed as a Swift dynamic framework, and is only added to the test
 You may know that TestKit started as a unit testing framework which separated out test inputs and outputs into an external JSON file which could then be modified to add new test cases without writing additional code.  
 
 The latest version of TestKit still adheres to this same principle and the same goals, but now uses a broad standard (Gherkin) instead of a custom JSON schema for defining the test inputs and outputs. In fact, not only are the .feature files of the new version of TestKit much more concise and easily readable than the old .testkit files, but the process of adding step handlers and the code needed to validate unit test output in Swift has also been simplified.  
-
-For unit tests, TestKit provides a few step handlers that are already implemented out of the box:
-
-So unit tests are written in this simple format:
-
-Given
-When
-Then
-
-The “Given” and “Then” steps are already implemented for you, so all you need to do is write a step handler for the “When” statement that knows how to call the function you are testing, pass it the input value already said by TestKit to a variable, and save the function output to a new variable defined by TestKit.  
-
-Here is an example:
-
-
-There is one additional requirement: whatever type of output that is produced by your function must be extended (in your unit test target only) to conform to the TestKitUnitTestOutput protocol. This protocol has a single method, which will receive the expected output from TestKit, and allows you how to check if the expected output matches the actual output.  
-
-Here is an example:
 
 The TestKitExample project includes an example of unit testing a function with multiple inputs and expected outputs, which can be used as a reference. The advantages of writing unit tests in this way, instead of completely in code are:
 
